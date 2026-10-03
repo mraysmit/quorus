@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -151,6 +152,29 @@ public final class AppConfig {
             return getNodeId() + "=localhost:" + getRaftPort();
         }
         return nodes;
+    }
+
+    /**
+     * The HTTP API base URL of each controller, by node ID, from {@code quorus.cluster.api-endpoints}
+     * ({@code node1=https://host1:8443,node2=...}). A follower names the leader's entry in
+     * {@code X-Quorus-Leader} when it refuses a write. Empty when not configured.
+     */
+    public Map<String, String> getClusterApiEndpoints() {
+        Map<String, String> endpoints = new LinkedHashMap<>();
+        for (String entry : getString("quorus.cluster.api-endpoints", "").split(",")) {
+            if (entry.isBlank()) {
+                continue;
+            }
+            int separator = entry.indexOf('=');
+            String nodeId = separator < 0 ? "" : entry.substring(0, separator).trim();
+            String url = separator < 0 ? "" : entry.substring(separator + 1).trim();
+            if (nodeId.isEmpty() || !(url.startsWith("http://") || url.startsWith("https://"))) {
+                throw new IllegalStateException("quorus.cluster.api-endpoints must be a comma-separated list of "
+                        + "nodeId=http(s)://host:port entries, got: " + entry.trim());
+            }
+            endpoints.put(nodeId, url.endsWith("/") ? url.substring(0, url.length() - 1) : url);
+        }
+        return Map.copyOf(endpoints);
     }
 
     // ==================== Raft Storage Configuration ====================
@@ -360,6 +384,8 @@ public final class AppConfig {
             throw new IllegalStateException(
                     "HTTP port and Raft port must be different, both are: " + httpPort);
         }
+
+        getClusterApiEndpoints(); // throws on a malformed entry
 
         // Validate thread pool size
         int poolSize = getRaftIoPoolSize();

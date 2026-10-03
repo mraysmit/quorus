@@ -179,7 +179,7 @@ Reads support:
 
 The response reports the applied consistency and commit index. The default for security, assignment, and administrative state is `linearizable`.
 
-**Current position:** a follower rejects a replicated write with `503` and code `NOT_LEADER` (leader known; its ID is in `detail`) or `NO_LEADER`, without `Retry-After` or `X-Quorus-Leader`. No redirect is issued. The `consistency` and `maxStaleness` parameters are not read: every read is served from the receiving node's local state, so a follower read may be stale.
+**Current position:** a follower rejects a replicated write with `503` and code `NOT_LEADER` (leader known; its ID is in `detail`) or `NO_LEADER`, each with `Retry-After: 1`. A `NOT_LEADER` response carries `X-Quorus-Leader` with the leader's API base URL when that controller is configured with it (`quorus.cluster.api-endpoints`); otherwise the header is absent. No redirect is issued. A Quorus agent follows the header only to a controller in its own configured list. The `consistency` and `maxStaleness` parameters are not read: every read is served from the receiving node's local state, so a follower read may be stale.
 
 ## 4. Authentication, Authorization, and Audit
 
@@ -655,7 +655,7 @@ Release documentation MUST publish a generated endpoint coverage report with `Cu
 | API-09 | Open | High | Tenant, hierarchy, quota, usage, and policy services have no controller REST resources | Administrative behavior requires internal integration rather than a supported contract |
 | API-10 | Partial | High | Route API exposes configuration without validation, trigger execution, or execution history | Route CRUD can be mistaken for an operating route service |
 | API-11 | Open | High | No immutable audit query and evidence-export API | Security and operational investigations lack supported evidence access |
-| API-12 | Partial | High | Errors use an RFC 9457 problem format and the security-event collection has bounded cursor pagination. Idempotency keys, ETag/preconditions, asynchronous operations, general pagination and filtering, the required error-code vocabulary (§16), and the `Retry-After`/`X-Quorus-Leader` headers on non-leader responses (§3.8) are absent | Client retry and concurrent administration behavior is unsafe or inconsistent |
+| API-12 | Partial | High | Errors use an RFC 9457 problem format and the security-event collection has bounded cursor pagination. Idempotency keys, ETag/preconditions, asynchronous operations, general pagination and filtering, and the required error-code vocabulary (§16) are absent. Non-leader responses carry `Retry-After` and, when the leader's endpoint is configured, `X-Quorus-Leader` (§3.8) | Client retry and concurrent administration behavior is unsafe or inconsistent |
 | API-13 | Partial | High | Cluster and configuration endpoints do not expose complete consistency, replication, snapshot, and redacted effective-configuration state, and reads have no selectable consistency mode (§3.8) | Operators lack a supported administrative view of controller health and configuration |
 | API-14 | Open | Medium | API/agent compatibility, deprecation, retention, export, and event-stream replay contracts are not implemented | Long-lived integrations and evidence handling remain fragile |
 

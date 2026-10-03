@@ -153,7 +153,7 @@ public class HttpApiServer {
         router.route().handler(BodyHandler.create()
                 .setBodyLimit(appConfig.getHttpMaxBodyBytes()));
         router.route().handler(drainModeHandler);
-        router.route().handler(new LeaderGuardHandler(raftNode));
+        router.route().handler(new LeaderGuardHandler(raftNode, appConfig.getClusterApiEndpoints()));
         router.route().failureHandler(new GlobalErrorHandler());
 
         // ==================== Infrastructure Endpoints ====================

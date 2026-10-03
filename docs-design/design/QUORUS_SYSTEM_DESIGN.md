@@ -327,7 +327,7 @@ The diagram below shows how Quorus organizes its distributed file transfer syste
 
 1. **Client Request**: A REST API call arrives at the `nginx` load balancer (port 8080 in the `controller-first` compose topology)
 2. **Load Balancer Routing**: `nginx` forwards the request to one of the three controllers (upstreams `controller1:8080`, `controller2:8080`, `controller3:8080`)
-3. **Leader Handling**: `LeaderGuardHandler` rejects a write (`POST`/`PUT`/`DELETE`/`PATCH` under `/api/`) on a FOLLOWER with `503 NOT_LEADER` and the known leader ID, or `503 NO_LEADER`. The implementation does not issue an HTTP redirect. Only the LEADER's `RaftNode` accepts commands.
+3. **Leader Handling**: `LeaderGuardHandler` rejects a write (`POST`/`PUT`/`DELETE`/`PATCH` under `/api/`) on a FOLLOWER with `503 NOT_LEADER` and the known leader ID, or `503 NO_LEADER`, each with `Retry-After`; when the leader's API endpoint is configured the response also names it in `X-Quorus-Leader`. The implementation does not issue an HTTP redirect. Only the LEADER's `RaftNode` accepts commands.
 4. **State Replication**: The LEADER's handler calls `RaftNode.submitCommand(RaftCommand)`; the leader appends the command to its Raft log and replicates it to the followers via `GrpcRaftTransport` (port 9080)
 5. **Commit & Apply**: Once a majority (2 of 3) has the entry, the LEADER commits it and every node applies it through `QuorusStateStore.apply()`, which updates the replicated maps.
 6. **Agent Assignment**: A caller assigns the job with `POST /api/v1/assignments`, which is also committed through Raft. The controller runs no scheduler: nothing selects an agent or assigns a submitted job by itself (`ENG-01`, with `P2-01`). The workflow engine is not involved.
@@ -512,6 +512,9 @@ A property's environment name is the key in upper case with `.` and `-` replaced
 | `quorus.http.port` | `QUORUS_HTTP_PORT` | `8080` |
 | `quorus.raft.port` | `QUORUS_RAFT_PORT` | `9080` |
 | `quorus.cluster.nodes` | `QUORUS_CLUSTER_NODES` | empty (single node) |
+| `quorus.cluster.api-endpoints` | `QUORUS_CLUSTER_API_ENDPOINTS` | empty (no leader hint); `node1=https://host1:8443,...` |
+| `quorus.agent.controller.url` | `QUORUS_AGENT_CONTROLLER_URL` | `https://localhost:8080/api/v1`; a comma-separated list for a cluster |
+| `quorus.agent.registration.retry-interval-ms` | `QUORUS_AGENT_REGISTRATION_RETRY_INTERVAL_MS` | `5000` |
 | `quorus.raft.election-timeout-ms` | `QUORUS_RAFT_ELECTION_TIMEOUT_MS` | `5000` |
 | `quorus.raft.heartbeat-interval-ms` | `QUORUS_RAFT_HEARTBEAT_INTERVAL_MS` | `1000` |
 | `quorus.raft.storage.path` | `QUORUS_RAFT_STORAGE_PATH` | empty (`./data/raft/<nodeId>`) |
@@ -1312,7 +1315,12 @@ public void handle(RoutingContext ctx) {
         return;
     }
     String leaderId = raftNode.getLeaderId();
+    ctx.response().putHeader("Retry-After", "1");
     if (leaderId != null && !leaderId.isEmpty()) {
+        String leaderEndpoint = apiEndpoints.get(leaderId);  // from quorus.cluster.api-endpoints
+        if (leaderEndpoint != null) {
+            ctx.response().putHeader("X-Quorus-Leader", leaderEndpoint);
+        }
         ctx.fail(QuorusApiException.notLeader(leaderId));   // 503, code NOT_LEADER
     } else {
         ctx.fail(QuorusApiException.noLeader());            // 503, code NO_LEADER
@@ -1320,7 +1328,7 @@ public void handle(RoutingContext ctx) {
 }
 ```
 
-`GlobalErrorHandler` turns the failure into an `application/problem+json` body carrying the code and the leader ID. No redirect and no `Retry-After` header is sent. On the leader, the handler builds a `RaftCommand` and calls `raftNode.submitCommand(command)`, which completes when the command is committed and applied.
+`GlobalErrorHandler` turns the failure into an `application/problem+json` body carrying the code and the leader ID. No redirect is sent. An agent configured with every controller sends the refused write to the leader named in `X-Quorus-Leader`, if that is one of its configured controllers, or else to the next one. On the leader, the handler builds a `RaftCommand` and calls `raftNode.submitCommand(command)`, which completes when the command is committed and applied.
 
 The node-local exemption means `PUT /api/v1/security/trust/revocations` and `POST /api/v1/security/authorization/check` work on followers, which the per-node revocation procedure needs (register `SEC-09`).
 
@@ -1544,7 +1552,7 @@ sequenceDiagram
     A->>C1: Progress and terminal report
 ```
 
-A write that reaches a follower is rejected with `503 NOT_LEADER` rather than forwarded; the diagram shows the leader for simplicity.
+A write that reaches a follower is rejected with `503 NOT_LEADER` rather than forwarded, and the agent sends it again to the leader; the diagram shows the leader for simplicity. An agent whose registration no controller can take keeps trying; it stops only when a controller rejects the registration.
 
 ### Failure Detection and Recovery
 

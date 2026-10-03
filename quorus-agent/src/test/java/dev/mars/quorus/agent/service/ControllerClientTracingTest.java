@@ -59,7 +59,7 @@ class ControllerClientTracingTest {
                 .on("POST", "/api/v1/agents/heartbeat", Reply.json(200, "{}").always());
              ControllerClient client = ControllerClient.create(config(controller.url()))) {
 
-            client.postJson(controller.url() + "/api/v1/agents/heartbeat", "{}");
+            client.postJson("/agents/heartbeat", "{}");
 
             SpanData span = spans.getFinishedSpanItems().getFirst();
             assertEquals("POST", span.getName());
@@ -78,7 +78,7 @@ class ControllerClientTracingTest {
     @Test
     void aFailedRequestIsAnErrorSpan() {
         try (ControllerClient client = ControllerClient.create(config("http://localhost:59999"))) {
-            assertThrows(IOException.class, () -> client.get("http://localhost:59999/api/v1/agents/a/jobs"));
+            assertThrows(IOException.class, () -> client.get("/agents/a/jobs"));
 
             SpanData span = spans.getFinishedSpanItems().getFirst();
             assertEquals(StatusCode.ERROR, span.getStatus().getStatusCode());

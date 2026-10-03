@@ -40,6 +40,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.net.URI;
 import java.nio.file.Path;
+import java.util.Properties;
 import java.util.Set;
 
 import static dev.mars.quorus.testing.TestFutureUtils.awaitSuccess;
@@ -75,6 +76,7 @@ class LeaderGuardHandlerTest {
     private static RaftNode followerNode;
     private static HttpApiServer leaderServer;
     private static HttpApiServer followerServer;
+    private static HttpApiServer unhintedFollowerServer;
     private static WebClient webClient;
 
     @BeforeAll
@@ -148,8 +150,17 @@ class LeaderGuardHandlerTest {
         leaderServer = new HttpApiServer(vertx, LEADER_PORT, leaderNode, leaderStateStore, ControllerTestConfig.create());
         awaitSuccess(leaderServer.start(), ASYNC_SETUP_TIMEOUT);
 
-        followerServer = new HttpApiServer(vertx, FOLLOWER_PORT, followerNode, followerStateStore, ControllerTestConfig.create());
+        // This follower knows the leader's API endpoint; the unhinted one does not (ENG-27).
+        Properties endpoints = new Properties();
+        endpoints.setProperty("quorus.cluster.api-endpoints",
+                leaderNode.getNodeId() + "=http://localhost:" + LEADER_PORT);
+        followerServer = new HttpApiServer(vertx, FOLLOWER_PORT, followerNode, followerStateStore,
+                ControllerTestConfig.create(endpoints));
         awaitSuccess(followerServer.start(), ASYNC_SETUP_TIMEOUT);
+
+        unhintedFollowerServer = new HttpApiServer(vertx, 0, followerNode, followerStateStore,
+                ControllerTestConfig.create());
+        awaitSuccess(unhintedFollowerServer.start(), ASYNC_SETUP_TIMEOUT);
 
         webClient = WebClient.create(vertx);
     }
@@ -159,6 +170,7 @@ class LeaderGuardHandlerTest {
         if (webClient != null) webClient.close();
         if (leaderServer != null) awaitSuccess(leaderServer.stop(), Duration.ofSeconds(5));
         if (followerServer != null) awaitSuccess(followerServer.stop(), Duration.ofSeconds(5));
+        if (unhintedFollowerServer != null) awaitSuccess(unhintedFollowerServer.stop(), Duration.ofSeconds(5));
         if (vertx != null) awaitSuccess(vertx.close(), Duration.ofSeconds(5));
         InMemoryTransportSimulator.clearAllTransports();
     }
@@ -212,6 +224,59 @@ class LeaderGuardHandlerTest {
                                 "Error code should be NOT_LEADER or NO_LEADER, got: " + code);
                         ctx.completeNow();
                     })));
+        }
+
+        /** Register item ENG-27, REST Spec §3.8. */
+        @Test
+        @DisplayName("A refused write names the leader's API endpoint and when to retry")
+        void refusedWriteNamesTheLeaderEndpoint() {
+            var response = awaitSuccess(webClient.post(FOLLOWER_PORT, "localhost", "/api/v1/assignments")
+                    .sendJsonObject(new JsonObject().put("jobId", "j").put("agentId", "a")), ASYNC_SETUP_TIMEOUT);
+
+            assertEquals(503, response.statusCode());
+            assertEquals("NOT_LEADER", response.bodyAsJsonObject().getString("code"));
+            assertEquals("http://localhost:" + LEADER_PORT, response.getHeader("X-Quorus-Leader"));
+            assertEquals("1", response.getHeader("Retry-After"));
+        }
+
+        @Test
+        @DisplayName("A follower that does not know the leader's endpoint sends no leader header")
+        void refusedWriteWithoutAConfiguredEndpointSendsNoLeaderHeader() {
+            var response = awaitSuccess(webClient.post(unhintedFollowerServer.actualPort(), "localhost",
+                    "/api/v1/assignments").sendJsonObject(new JsonObject().put("jobId", "j").put("agentId", "a")),
+                    ASYNC_SETUP_TIMEOUT);
+
+            assertEquals(503, response.statusCode());
+            assertNull(response.getHeader("X-Quorus-Leader"));
+            assertEquals("1", response.getHeader("Retry-After"));
+        }
+
+        @Test
+        @DisplayName("A node that knows no leader says when to retry and names no leader")
+        void refusedWriteWithoutALeaderSaysWhenToRetry() {
+            // One member of a three-member cluster whose peers never start: it cannot elect a leader.
+            RaftNode lone = RaftNode.builder().vertx(vertx).nodeId("guard-lone-1")
+                    .clusterNodes(Set.of("guard-lone-1", "guard-lone-2", "guard-lone-3"))
+                    .transport(new InMemoryTransportSimulator("guard-lone-1")).stateMachine(new QuorusStateStore())
+                    .mode(RaftNodeMode.volatileMode()).electionTimeout(60_000).heartbeatInterval(100).build();
+            awaitSuccess(lone.start(), ASYNC_SETUP_TIMEOUT);
+            Properties endpoints = new Properties();
+            endpoints.setProperty("quorus.cluster.api-endpoints", "guard-lone-2=http://localhost:1");
+            HttpApiServer server = new HttpApiServer(vertx, 0, lone, new QuorusStateStore(),
+                    ControllerTestConfig.create(endpoints));
+            awaitSuccess(server.start(), ASYNC_SETUP_TIMEOUT);
+            try {
+                var response = awaitSuccess(webClient.post(server.actualPort(), "localhost", "/api/v1/assignments")
+                        .sendJsonObject(new JsonObject().put("jobId", "j").put("agentId", "a")), ASYNC_SETUP_TIMEOUT);
+
+                assertEquals(503, response.statusCode());
+                assertEquals("NO_LEADER", response.bodyAsJsonObject().getString("code"));
+                assertEquals("1", response.getHeader("Retry-After"));
+                assertNull(response.getHeader("X-Quorus-Leader"));
+            } finally {
+                awaitSuccess(server.stop(), ASYNC_SETUP_TIMEOUT);
+                awaitSuccess(lone.stop(), ASYNC_SETUP_TIMEOUT);
+            }
         }
 
         @Test

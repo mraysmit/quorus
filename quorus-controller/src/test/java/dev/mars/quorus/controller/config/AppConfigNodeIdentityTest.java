@@ -227,6 +227,35 @@ class AppConfigNodeIdentityTest {
         assertTrue(error.getMessage().contains("raftlog"));
     }
 
+    /** Register item ENG-27: the API endpoint of each controller, for the leader hint. */
+    @Test
+    void clusterApiEndpointsMapNodeIdsToBaseUrls() {
+        AppConfig config = new AppConfig("test", properties("quorus.cluster.api-endpoints",
+                "node1=https://controller1:8443, node2=https://controller2:8443/"));
+
+        assertEquals(Map.of("node1", "https://controller1:8443", "node2", "https://controller2:8443"),
+                config.getClusterApiEndpoints());
+        assertEquals(Map.of(), new AppConfig("test", new Properties()).getClusterApiEndpoints());
+    }
+
+    @Test
+    void clusterApiEndpointsAreReadFromTheirEnvironmentVariable() {
+        AppConfig config = new AppConfig("test", new Properties(),
+                Map.of("QUORUS_CLUSTER_API_ENDPOINTS", "node1=http://controller1:8080"));
+
+        assertEquals(Map.of("node1", "http://controller1:8080"), config.getClusterApiEndpoints());
+    }
+
+    @Test
+    void validationRejectsAMalformedClusterApiEndpoint() {
+        for (String malformed : new String[]{"node1", "=https://controller1:8443", "node1=controller1:8443",
+                "node1=ftp://controller1"}) {
+            AppConfig config = new AppConfig("test", properties("quorus.cluster.api-endpoints", malformed));
+            IllegalStateException error = assertThrows(IllegalStateException.class, config::validate, malformed);
+            assertTrue(error.getMessage().contains("quorus.cluster.api-endpoints"), error.getMessage());
+        }
+    }
+
     private static Properties properties(String key, String value) {
         Properties properties = new Properties();
         properties.setProperty(key, value);

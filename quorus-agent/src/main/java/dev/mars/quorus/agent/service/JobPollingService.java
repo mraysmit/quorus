@@ -61,7 +61,7 @@ public class JobPollingService {
      * @throws InterruptedException if the calling thread is interrupted
      */
     public List<PendingJob> pollForJobs() throws InterruptedException {
-        String url = config.getControllerUrl() + "/agents/" + config.getAgentId() + "/jobs";
+        String url = "/agents/" + config.getAgentId() + "/jobs";
         try {
             ControllerClient.Response response = client.get(url);
             if (response.status() != 200) {

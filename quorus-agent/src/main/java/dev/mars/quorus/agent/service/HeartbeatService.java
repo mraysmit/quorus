@@ -63,7 +63,7 @@ public class HeartbeatService {
             return false;
         }
         try {
-            ControllerClient.Response response = client.postJson(config.getControllerUrl() + "/agents/heartbeat",
+            ControllerClient.Response response = client.postJson("/agents/heartbeat",
                     JSON.writeValueAsString(createHeartbeatRequest()));
             if (response.status() == 200) {
                 logger.debug("Heartbeat sent successfully for agent {}", config.getAgentId());
