@@ -114,7 +114,7 @@ checks that the standalone stack is reachable with the same client libraries the
 only test with an SMB server.
 
 It is tagged `docker` and excluded from the default build, because the stack publishes fixed host ports
-(decision DR-Q4 in the [register](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md)). It runs in the Docker
+(decision DR-Q4 in the [register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-18.md)). It runs in the Docker
 lane, or on its own:
 
 ```bash

@@ -282,7 +282,7 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
 
             Instant endTime = Instant.now();
             WorkflowStatus finalStatus = groupExecutions.stream()
-                    .allMatch(WorkflowExecution.GroupExecution::isSuccessful) ?
+                    .allMatch(group -> group.isSuccessful() || group.isSkipped()) ?
                     WorkflowStatus.COMPLETED : WorkflowStatus.FAILED;
 
             // Record workflow completion (Phase 9 - Jan 2026)
@@ -423,6 +423,8 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
 
         Set<String> inWorkflow = sortedGroups.stream().map(TransferGroup::getName).collect(Collectors.toSet());
         Map<String, WorkflowExecution.GroupExecution> ran = new HashMap<>();
+        // What conditions read: each group and transfer that ran, and whether it succeeded
+        Map<String, Boolean> outcomes = new HashMap<>();
         List<TransferGroup> pending = new ArrayList<>(sortedGroups);
         boolean stop = false;
         while (!pending.isEmpty() && !stop) {
@@ -435,13 +437,14 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
                 break; // Unreachable after a topological sort; guards against a loop that never ends.
             }
             List<WorkflowExecution.GroupExecution> results = new ArrayList<>();
+            Map<String, Boolean> finished = Map.copyOf(outcomes);
             if (round.size() == 1) {
-                results.add(executeGroup(round.getFirst(), workflowName, virtualRun, deadline));
+                results.add(runGroup(round.getFirst(), finished, workflowName, virtualRun, deadline));
             } else {
                 List<TaskScope.Subtask<WorkflowExecution.GroupExecution>> subtasks = new ArrayList<>();
                 try (TaskScope scope = TaskScope.open("workflow-groups", remaining(deadline, "the next groups"))) {
                     for (TransferGroup group : round) {
-                        subtasks.add(scope.fork(() -> executeGroup(group, workflowName, virtualRun, deadline)));
+                        subtasks.add(scope.fork(() -> runGroup(group, finished, workflowName, virtualRun, deadline)));
                     }
                     scope.join();
                 }
@@ -452,8 +455,13 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
                 WorkflowExecution.GroupExecution groupExecution = results.get(i);
                 ran.put(group.getName(), groupExecution);
                 pending.remove(group);
-                // Stop execution if group failed and workflow doesn't continue on error
-                if (!groupExecution.isSuccessful() && !group.isContinueOnError()) {
+                if (!groupExecution.isSkipped()) {
+                    outcomes.put(group.getName(), groupExecution.isSuccessful());
+                }
+                groupExecution.getTransferResults().forEach((transfer, result) ->
+                        outcomes.put(transfer, result.isSuccessful()));
+                // Stop execution if group failed and workflow doesn't continue on error; a skip is not a failure
+                if (!groupExecution.isSuccessful() && !groupExecution.isSkipped() && !group.isContinueOnError()) {
                     stop = true;
                 }
             }
@@ -462,17 +470,54 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
     }
 
     /**
-     * Runs one group's transfers in parallel and waits for all of them. A transfer that fails or
-     * throws gives a failed result; it does not stop the other transfers of the group.
+     * Runs a group if its condition holds (ENG-14). A group whose condition is false is skipped; one
+     * whose condition cannot be evaluated fails without starting a transfer.
+     *
+     * @param finished the outcome of every group and transfer that has finished, by name
      */
-    private WorkflowExecution.GroupExecution executeGroup(TransferGroup group, String workflowName,
-                                                          boolean virtualRun, Instant deadline)
+    private WorkflowExecution.GroupExecution runGroup(TransferGroup group, Map<String, Boolean> finished,
+                                                      String workflowName, boolean virtualRun, Instant deadline)
+            throws InterruptedException {
+        if (group.getCondition() != null) {
+            Instant now = Instant.now();
+            try {
+                if (!holds(group.getCondition(), finished)) {
+                    logger.info("Skipped group {}: its condition is false: {}", group.getName(), group.getCondition());
+                    return new WorkflowExecution.GroupExecution(group.getName(), WorkflowStatus.SKIPPED,
+                            now, Instant.now(), Map.of(), null);
+                }
+            } catch (WorkflowCondition.InvalidConditionException e) {
+                logger.error("Group {} failed: its condition could not be evaluated: {}", group.getName(), e.getMessage());
+                return new WorkflowExecution.GroupExecution(group.getName(), WorkflowStatus.FAILED,
+                        now, Instant.now(), Map.of(), "Condition could not be evaluated: " + e.getMessage());
+            }
+        }
+        return executeGroup(group, finished, workflowName, virtualRun, deadline);
+    }
+
+    private static boolean holds(String condition, Map<String, Boolean> finished) {
+        return WorkflowCondition.evaluate(WorkflowCondition.parse(condition), finished::get);
+    }
+
+    /**
+     * Runs one group's transfers in parallel and waits for all of them. A transfer that fails or
+     * throws gives a failed result; it does not stop the other transfers of the group. A transfer
+     * whose condition is false does not start and is recorded as skipped; one whose condition cannot
+     * be evaluated does not start and gets a failed result.
+     */
+    private WorkflowExecution.GroupExecution executeGroup(TransferGroup group, Map<String, Boolean> finished,
+                                                          String workflowName, boolean virtualRun, Instant deadline)
             throws InterruptedException {
         Instant groupStart = Instant.now();
+        Set<String> skipped = new LinkedHashSet<>();
+        Map<String, TransferResult> notStarted = new HashMap<>();
         Map<String, TaskScope.Subtask<TransferResult>> subtasks = new LinkedHashMap<>();
         try (TaskScope scope = TaskScope.open("workflow-group-" + group.getName(),
                 remaining(deadline, "group " + group.getName()))) {
             for (TransferGroup.TransferDefinition transfer : group.getTransfers()) {
+                if (!conditionAllowsStart(transfer, finished, skipped, notStarted)) {
+                    continue;
+                }
                 subtasks.put(transfer.getName(), scope.fork(virtualRun
                         ? () -> simulateTransfer(transfer)
                         : () -> runTransfer(transfer, group.getRetryCount())));
@@ -480,19 +525,29 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
             scope.join();
         }
 
+        // Every transfer that has a result, in definition order
+        Map<String, TransferResult> results = new LinkedHashMap<>();
+        for (TransferGroup.TransferDefinition transfer : group.getTransfers()) {
+            TaskScope.Subtask<TransferResult> subtask = subtasks.get(transfer.getName());
+            if (subtask != null) {
+                results.put(transfer.getName(), subtask.get());
+            } else if (notStarted.containsKey(transfer.getName())) {
+                results.put(transfer.getName(), notStarted.get(transfer.getName()));
+            }
+        }
+
         if (virtualRun) {
-            Map<String, TransferResult> transferResults = new HashMap<>();
-            subtasks.forEach((name, subtask) -> transferResults.put(name, subtask.get()));
             logger.info("Virtual run completed group: {} (parallel simulation)", group.getName());
-            return new WorkflowExecution.GroupExecution(group.getName(), WorkflowStatus.COMPLETED,
-                    groupStart, Instant.now(), transferResults, null);
+            return new WorkflowExecution.GroupExecution(group.getName(),
+                    notStarted.isEmpty() ? WorkflowStatus.COMPLETED : WorkflowStatus.FAILED,
+                    groupStart, Instant.now(), results, null, skipped);
         }
 
         Map<String, TransferResult> transferResults = new HashMap<>();
         boolean groupSuccess = true;
         String groupError = null;
-        for (Map.Entry<String, TaskScope.Subtask<TransferResult>> entry : subtasks.entrySet()) {
-            TransferResult result = entry.getValue().get();
+        for (Map.Entry<String, TransferResult> entry : results.entrySet()) {
+            TransferResult result = entry.getValue();
             transferResults.put(entry.getKey(), result);
 
             if (workflowName != null) {
@@ -514,7 +569,41 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
         WorkflowStatus groupStatus = groupSuccess ? WorkflowStatus.COMPLETED : WorkflowStatus.FAILED;
         logger.info("Executed group: {} with status: {} (parallel execution)", group.getName(), groupStatus);
         return new WorkflowExecution.GroupExecution(group.getName(), groupStatus, groupStart, Instant.now(),
-                transferResults, groupError);
+                transferResults, groupError, skipped);
+    }
+
+    /**
+     * True if {@code transfer} may start: it has no condition, or its condition holds. Otherwise the
+     * transfer is added to {@code skipped} (condition false) or given a failed result in
+     * {@code notStarted} (condition could not be evaluated).
+     */
+    private static boolean conditionAllowsStart(TransferGroup.TransferDefinition transfer, Map<String, Boolean> finished,
+                                                Set<String> skipped, Map<String, TransferResult> notStarted) {
+        if (transfer.getCondition() == null) {
+            return true;
+        }
+        try {
+            if (holds(transfer.getCondition(), finished)) {
+                return true;
+            }
+            logger.info("Skipped transfer {}: its condition is false: {}", transfer.getName(), transfer.getCondition());
+            skipped.add(transfer.getName());
+        } catch (WorkflowCondition.InvalidConditionException e) {
+            logger.error("Transfer {} failed: its condition could not be evaluated: {}", transfer.getName(), e.getMessage());
+            notStarted.put(transfer.getName(), conditionFailure(e));
+        }
+        return false;
+    }
+
+    /** The failed result of a transfer that did not start because its condition could not be evaluated. */
+    private static TransferResult conditionFailure(WorkflowCondition.InvalidConditionException e) {
+        return TransferResult.builder()
+                .requestId(UUID.randomUUID().toString())
+                .finalStatus(TransferStatus.FAILED)
+                .bytesTransferred(0L)
+                .errorMessage("Condition could not be evaluated: " + e.getMessage())
+                .cause(e)
+                .build();
     }
 
     /**

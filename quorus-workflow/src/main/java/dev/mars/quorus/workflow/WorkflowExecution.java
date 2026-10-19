@@ -166,15 +166,26 @@ public class WorkflowExecution {
         private final Instant endTime;
         private final Map<String, TransferResult> transferResults;
         private final String errorMessage;
-        
+        private final java.util.Set<String> skippedTransfers;
+
         public GroupExecution(String groupName, WorkflowStatus status, Instant startTime, Instant endTime,
                             Map<String, TransferResult> transferResults, String errorMessage) {
+            this(groupName, status, startTime, endTime, transferResults, errorMessage, java.util.Set.of());
+        }
+
+        /**
+         * @param skippedTransfers the names of the group's transfers whose condition was false
+         */
+        public GroupExecution(String groupName, WorkflowStatus status, Instant startTime, Instant endTime,
+                            Map<String, TransferResult> transferResults, String errorMessage,
+                            java.util.Set<String> skippedTransfers) {
             this.groupName = Objects.requireNonNull(groupName, "Group name cannot be null");
             this.status = Objects.requireNonNull(status, "Status cannot be null");
             this.startTime = Objects.requireNonNull(startTime, "Start time cannot be null");
             this.endTime = endTime;
             this.transferResults = transferResults != null ? Map.copyOf(transferResults) : Map.of();
             this.errorMessage = errorMessage;
+            this.skippedTransfers = skippedTransfers != null ? java.util.Set.copyOf(skippedTransfers) : java.util.Set.of();
         }
         
         public String getGroupName() {
@@ -204,7 +215,17 @@ public class WorkflowExecution {
         public Optional<String> getErrorMessage() {
             return Optional.ofNullable(errorMessage);
         }
-        
+
+        /** The names of this group's transfers whose condition was false, so they did not run. */
+        public java.util.Set<String> getSkippedTransfers() {
+            return skippedTransfers;
+        }
+
+        /** True if the group's condition was false, so none of its transfers ran. A skip is not a failure. */
+        public boolean isSkipped() {
+            return status == WorkflowStatus.SKIPPED;
+        }
+
         public boolean isSuccessful() {
             return status == WorkflowStatus.COMPLETED && 
                    transferResults.values().stream().allMatch(TransferResult::isSuccessful);
@@ -216,6 +237,7 @@ public class WorkflowExecution {
                    "groupName='" + groupName + '\'' +
                    ", status=" + status +
                    ", transferCount=" + transferResults.size() +
+                   ", skippedTransfers=" + skippedTransfers +
                    '}';
         }
     }

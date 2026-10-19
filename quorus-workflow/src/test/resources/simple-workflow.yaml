@@ -38,7 +38,7 @@ spec:
           destination: "{{outputDir}}/test-file-1.bin"
           protocol: http
           options:
-            timeout: 30s
+            expectedSize: "{{fileSize}}"
             
         - name: download-test-file-2
           source: "{{baseUrl}}/bytes/2048"
@@ -76,5 +76,4 @@ spec:
           destination: "{{outputDir}}/large-file.bin"
           protocol: http
           options:
-            chunkSize: 1024
-            maxRetries: 5
+            expectedSize: 8192

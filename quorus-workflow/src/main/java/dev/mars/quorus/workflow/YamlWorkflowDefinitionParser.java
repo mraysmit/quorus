@@ -466,6 +466,110 @@ public class YamlWorkflowDefinitionParser implements WorkflowDefinitionParser {
                 result.addError("spec.transferGroups", "Duplicate transfer group name: " + group.getName());
             }
         }
+
+        // Only the defined transfer options are accepted, with valid literal values (DR-Q1)
+        List<TransferGroup> groups = spec.getTransferGroups();
+        for (int g = 0; g < groups.size(); g++) {
+            List<TransferGroup.TransferDefinition> transfers = groups.get(g).getTransfers();
+            for (int t = 0; t < transfers.size(); t++) {
+                TransferOptions.validate("spec.transferGroups[" + g + "].transfers[" + t + "]",
+                        transfers.get(t).getOptions(), result);
+            }
+        }
+
+        validateConditions(groups, result);
+    }
+
+    /**
+     * Each group and transfer condition must be in the grammar (ENG-Q1), and every name it refers to
+     * must be exactly one group or transfer that has finished when the condition is evaluated: a group
+     * this group depends on, directly or through other groups, or a transfer of such a group. A
+     * transfer of the same group runs in parallel with it, so it cannot be named.
+     */
+    private void validateConditions(List<TransferGroup> groups, ValidationResult result) {
+        Map<String, TransferGroup> groupsByName = new HashMap<>();
+        Map<String, List<String>> transferOwners = new HashMap<>();
+        for (TransferGroup group : groups) {
+            groupsByName.putIfAbsent(group.getName(), group);
+            for (TransferGroup.TransferDefinition transfer : group.getTransfers()) {
+                transferOwners.computeIfAbsent(transfer.getName(), name -> new ArrayList<>()).add(group.getName());
+            }
+        }
+        for (int g = 0; g < groups.size(); g++) {
+            TransferGroup group = groups.get(g);
+            String path = "spec.transferGroups[" + g + "]";
+            Set<String> upstream = upstreamOf(group.getName(), groupsByName);
+            if (group.getCondition() != null) {
+                validateCondition(path + ".condition", group.getCondition(), group.getName(), upstream,
+                        groupsByName, transferOwners, result);
+            }
+            List<TransferGroup.TransferDefinition> transfers = group.getTransfers();
+            for (int t = 0; t < transfers.size(); t++) {
+                if (transfers.get(t).getCondition() != null) {
+                    validateCondition(path + ".transfers[" + t + "].condition", transfers.get(t).getCondition(),
+                            group.getName(), upstream, groupsByName, transferOwners, result);
+                }
+            }
+        }
+    }
+
+    private static void validateCondition(String field, String condition, String groupName, Set<String> upstream,
+                                          Map<String, TransferGroup> groupsByName,
+                                          Map<String, List<String>> transferOwners, ValidationResult result) {
+        WorkflowCondition.Expression expression;
+        try {
+            expression = WorkflowCondition.parse(condition);
+        } catch (WorkflowCondition.InvalidConditionException e) {
+            result.addError(field, "Invalid condition '" + condition + "': " + e.getMessage());
+            return;
+        }
+        for (WorkflowCondition.Reference reference : WorkflowCondition.references(expression)) {
+            String name = reference.name();
+            boolean isGroup = groupsByName.containsKey(name);
+            List<String> owners = transferOwners.getOrDefault(name, List.of());
+            if (!isGroup && owners.isEmpty()) {
+                result.addError(field, "Condition names '" + name + "', which is no group or transfer of this workflow");
+                continue;
+            }
+            if ((isGroup && !owners.isEmpty()) || owners.size() > 1) {
+                result.addError(field, "Condition names '" + name + "', which is ambiguous: it names "
+                        + (isGroup ? "a group and " : "") + owners.size() + " transfer(s)");
+                continue;
+            }
+            String target = isGroup ? name : owners.getFirst();
+            if (!upstream.contains(target)) {
+                result.addError(field, "Condition names '" + name + "', which has not finished when group '"
+                        + groupName + "' starts: " + (target.equals(groupName)
+                                ? "it is in the same group, whose transfers run in parallel"
+                                : "group '" + groupName + "' does not depend on group '" + target + "'")
+                        + ". A condition may name only groups this group depends on, directly or through other "
+                        + "groups, and their transfers");
+                continue;
+            }
+            if (reference.failure() && !groupsByName.get(target).isContinueOnError()) {
+                result.addWarning(field, "failure(" + name + ") can be true only if group '" + target
+                        + "' sets continueOnError: true; otherwise the workflow stops when it fails");
+            }
+        }
+    }
+
+    /** The groups that {@code groupName} depends on, directly or through other groups. */
+    private static Set<String> upstreamOf(String groupName, Map<String, TransferGroup> groupsByName) {
+        Set<String> upstream = new HashSet<>();
+        Deque<String> pending = new ArrayDeque<>(dependenciesOf(groupName, groupsByName));
+        while (!pending.isEmpty()) {
+            String dependency = pending.pop();
+            if (upstream.add(dependency)) {
+                pending.addAll(dependenciesOf(dependency, groupsByName));
+            }
+        }
+        upstream.remove(groupName); // a dependency cycle is reported by the dependency graph, not here
+        return upstream;
+    }
+
+    private static List<String> dependenciesOf(String groupName, Map<String, TransferGroup> groupsByName) {
+        TransferGroup group = groupsByName.get(groupName);
+        return group == null ? List.of() : group.getDependsOn();
     }
 
     @SuppressWarnings("unchecked")

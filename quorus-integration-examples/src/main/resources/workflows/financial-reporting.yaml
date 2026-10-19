@@ -33,13 +33,13 @@ spec:
     archivePath: "/archive/reports"
     compliancePath: "/compliance/submissions"
     
-    # Report settings
+    # Report settings. current_month, current_year and current_quarter are not defined here:
+    # the execution context must supply them, or variable resolution fails the run.
     reportMonth: "{{current_month}}"
     reportYear: "{{current_year}}"
     fiscalQuarter: "{{current_quarter}}"
     
     # Processing settings
-    timeout: "300s"
     retryAttempts: "2"
     
   execution:
@@ -62,16 +62,11 @@ spec:
           source: "{{financialDb}}/general_ledger"
           destination: "{{reportPath}}/raw/general-ledger-{{reportMonth}}.csv"
           protocol: database
-          options:
-            query: "SELECT * FROM general_ledger WHERE month = '{{reportMonth}}' AND year = '{{reportYear}}'"
-            timeout: "{{timeout}}"
             
         - name: extract-trial-balance
           source: "{{financialDb}}/trial_balance"
           destination: "{{reportPath}}/raw/trial-balance-{{reportMonth}}.csv"
           protocol: database
-          options:
-            query: "SELECT * FROM trial_balance WHERE period = '{{reportMonth}}-{{reportYear}}'"
             
         - name: extract-cash-flows
           source: "{{financialDb}}/cash_flows"
@@ -100,30 +95,37 @@ spec:
           source: "{{reportPath}}/raw/general-ledger-{{reportMonth}}.csv"
           destination: "{{reportPath}}/processed/reconciled-accounts-{{reportMonth}}.csv"
           protocol: file
-          options:
-            transformation: "reconciliation"
             
         - name: calculate-financial-ratios
           source: "{{reportPath}}/processed/reconciled-accounts-{{reportMonth}}.csv"
           destination: "{{reportPath}}/processed/financial-ratios-{{reportMonth}}.json"
           protocol: file
           
+        - name: validate-income-statement
+          source: "{{reportPath}}/raw/trial-balance-{{reportMonth}}.csv"
+          destination: "{{reportPath}}/validation/income-statement-validation-{{reportMonth}}.json"
+          protocol: file
+
+    # Validate the balance sheet once the accounts are reconciled. A condition can name only a group
+    # this one depends on, or its transfers: transfers of one group run in parallel.
+    - name: validate-statements
+      description: Validate the balance sheet against the reconciled accounts
+      dependsOn:
+        - transform-and-validate
+      continueOnError: false
+      transfers:
         - name: validate-balance-sheet
           source: "{{reportPath}}/processed/reconciled-accounts-{{reportMonth}}.csv"
           destination: "{{reportPath}}/validation/balance-sheet-validation-{{reportMonth}}.json"
           protocol: file
           condition: "success(reconcile-accounts)"
-          
-        - name: validate-income-statement
-          source: "{{reportPath}}/raw/trial-balance-{{reportMonth}}.csv"
-          destination: "{{reportPath}}/validation/income-statement-validation-{{reportMonth}}.json"
-          protocol: file
-          
+
     # Stage 3: Compliance Checks
     - name: compliance-validation
       description: Perform regulatory compliance checks
       dependsOn:
         - transform-and-validate
+        - validate-statements
       continueOnError: false
       retryCount: 2
       transfers:
@@ -131,9 +133,6 @@ spec:
           source: "{{reportPath}}/processed/reconciled-accounts-{{reportMonth}}.csv"
           destination: "{{complianceApi}}/sox/validate"
           protocol: https
-          options:
-            compliance_type: "sox"
-            period: "{{reportMonth}}-{{reportYear}}"
             
         - name: gaap-compliance-check
           source: "{{reportPath}}/processed/financial-ratios-{{reportMonth}}.json"
@@ -144,18 +143,26 @@ spec:
           source: "{{reportPath}}/validation/balance-sheet-validation-{{reportMonth}}.json"
           destination: "{{regulatoryApi}}/filing/validate"
           protocol: https
-          
+
+    # Record the compliance results once the SOX check has succeeded.
+    - name: record-compliance-results
+      description: Store the results of a successful SOX compliance check
+      dependsOn:
+        - compliance-validation
+      continueOnError: false
+      transfers:
         - name: store-compliance-results
           source: "{{complianceApi}}/sox/validate"
           destination: "{{complianceDb}}/compliance_results"
           protocol: database
           condition: "success(sox-compliance-check)"
-          
+
     # Stage 4: Report Generation
     - name: generate-reports
       description: Generate financial reports in multiple formats
       dependsOn:
         - compliance-validation
+        - record-compliance-results
       continueOnError: false
       retryCount: 1
       transfers:
@@ -163,8 +170,6 @@ spec:
           source: "{{templatePath}}/balance-sheet-template.xlsx"
           destination: "{{reportPath}}/final/balance-sheet-{{reportMonth}}-{{reportYear}}.xlsx"
           protocol: file
-          options:
-            template_data: "{{reportPath}}/processed/reconciled-accounts-{{reportMonth}}.csv"
             
         - name: generate-income-statement
           source: "{{templatePath}}/income-statement-template.xlsx"
@@ -180,9 +185,6 @@ spec:
           source: "{{reportPath}}/processed/financial-ratios-{{reportMonth}}.json"
           destination: "{{reportPath}}/final/executive-summary-{{reportMonth}}-{{reportYear}}.pdf"
           protocol: file
-          options:
-            format: "pdf"
-            template: "executive-summary"
             
     # Stage 5: Audit Trail and Archival
     - name: audit-and-archive
@@ -196,17 +198,11 @@ spec:
           source: "{{reportPath}}/final/balance-sheet-{{reportMonth}}-{{reportYear}}.xlsx"
           destination: "{{auditApi}}/trail/create"
           protocol: https
-          options:
-            audit_type: "financial_report"
-            period: "{{reportMonth}}-{{reportYear}}"
             
         - name: archive-reports
           source: "{{reportPath}}/final/"
           destination: "{{archivePath}}/{{reportYear}}/{{reportMonth}}/"
           protocol: file
-          options:
-            recursive: true
-            compress: true
             
         - name: store-audit-metadata
           source: "{{auditApi}}/trail/create"
@@ -231,8 +227,6 @@ spec:
           source: "{{reportPath}}/final/executive-summary-{{reportMonth}}-{{reportYear}}.pdf"
           destination: "email://executives@company.com"
           protocol: email
-          options:
-            subject: "Monthly Financial Report - {{reportMonth}} {{reportYear}}"
             
         - name: notify-compliance-team
           source: "{{complianceDb}}/compliance_results"

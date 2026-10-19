@@ -27,8 +27,6 @@ spec:
     logDir: "/var/log/quorus"
     
     # Processing settings
-    batchSize: "1000"
-    timeout: "300s"
     retryAttempts: "3"
     
   execution:
@@ -49,17 +47,12 @@ spec:
           source: "https://config.example.com/database/postgresql.conf"
           destination: "{{configDir}}/postgresql.conf"
           protocol: https
-          options:
-            timeout: "{{timeout}}"
-            validateCertificate: true
-            
+
         - name: download-connection-config
           source: "https://config.example.com/database/connections.yaml"
           destination: "{{configDir}}/connections.yaml"
           protocol: https
-          options:
-            timeout: "{{timeout}}"
-            
+
     # Stage 2: Initialize database schemas
     - name: initialize-schemas
       description: Setup database schemas and initial data
@@ -93,9 +86,7 @@ spec:
           source: "https://reference.example.com/country_codes.csv"
           destination: "{{dataDir}}/reference/country_codes.csv"
           protocol: https
-          options:
-            chunkSize: "{{batchSize}}"
-            
+
         - name: download-currency-rates
           source: "https://reference.example.com/currency_rates.json"
           destination: "{{dataDir}}/reference/currency_rates.json"
@@ -117,9 +108,7 @@ spec:
           source: "https://validation.example.com/db_validation.sh"
           destination: "{{dataDir}}/scripts/db_validation.sh"
           protocol: https
-          options:
-            executable: true
-            
+
         - name: download-test-queries
           source: "https://validation.example.com/test_queries.sql"
           destination: "{{dataDir}}/scripts/test_queries.sql"

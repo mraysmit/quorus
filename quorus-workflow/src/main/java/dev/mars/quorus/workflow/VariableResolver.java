@@ -16,6 +16,8 @@
 
 package dev.mars.quorus.workflow;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -32,6 +34,9 @@ import java.util.regex.Pattern;
 public class VariableResolver {
     
     private static final Pattern VARIABLE_PATTERN = Pattern.compile("\\{\\{([^}]+)\\}\\}");
+
+    /** How many levels of references inside variable values are resolved before resolution fails. */
+    public static final int MAX_NESTING_DEPTH = 10;
     
     private final Map<String, Object> globalVariables;
     private final Map<String, Object> contextVariables;
@@ -55,25 +60,53 @@ public class VariableResolver {
         return resolver;
     }
     
+    /**
+     * Replaces every {@code {{name}}} reference in {@code template} with the variable's value. A
+     * reference inside a variable's value is resolved in turn, up to {@link #MAX_NESTING_DEPTH}
+     * levels.
+     *
+     * @throws VariableResolutionException if a variable is undefined, if references form a cycle, or
+     *                                     if nesting is deeper than {@link #MAX_NESTING_DEPTH}
+     */
     public String resolve(String template) throws VariableResolutionException {
+        return resolve(template, new ArrayDeque<>());
+    }
+
+    /** {@code chain} holds the variables whose values are being resolved, outermost first. */
+    private String resolve(String template, Deque<String> chain) {
         if (template == null) {
             return null;
         }
-        
+
         Matcher matcher = VARIABLE_PATTERN.matcher(template);
-        StringBuffer result = new StringBuffer();
-        
+        StringBuilder result = new StringBuilder();
+
         while (matcher.find()) {
             String variableName = matcher.group(1).trim();
             Object value = resolveVariable(variableName);
-            
+
             if (value == null) {
                 throw new VariableResolutionException("Variable not found: " + variableName);
             }
-            
-            matcher.appendReplacement(result, Matcher.quoteReplacement(value.toString()));
+
+            String text = value.toString();
+            if (hasVariables(text)) {
+                if (chain.contains(variableName)) {
+                    throw new VariableResolutionException("Variable references form a cycle: "
+                            + String.join(" -> ", chain) + " -> " + variableName);
+                }
+                if (chain.size() >= MAX_NESTING_DEPTH) {
+                    throw new VariableResolutionException("Variable nesting exceeds the maximum depth of "
+                            + MAX_NESTING_DEPTH + ": " + String.join(" -> ", chain) + " -> " + variableName);
+                }
+                chain.addLast(variableName);
+                text = resolve(text, chain);
+                chain.removeLast();
+            }
+
+            matcher.appendReplacement(result, Matcher.quoteReplacement(text));
         }
-        
+
         matcher.appendTail(result);
         return result.toString();
     }

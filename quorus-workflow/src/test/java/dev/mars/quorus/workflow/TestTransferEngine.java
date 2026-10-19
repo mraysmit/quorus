@@ -51,6 +51,19 @@ class TestTransferEngine implements TransferEngine {
     private final AtomicInteger failuresBeforeSuccess = new AtomicInteger(0);
     /** One permit per transfer started; tests acquire permits to wait for starts without polling. */
     private final Semaphore started = new Semaphore(0);
+    private final java.util.List<TransferRequest> requests = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    private volatile String failSourcesContaining;
+
+    /** Fails every transfer whose source URI contains {@code text}; the others follow the behaviour. */
+    public void failSourcesContaining(String text) {
+        this.failSourcesContaining = text;
+    }
+
+    /** The requests this engine was asked to run, in the order they arrived. */
+    public java.util.List<TransferRequest> getRequests() {
+        return java.util.List.copyOf(requests);
+    }
     
     /**
      * Defines the behavior of the test transfer engine.
@@ -123,6 +136,7 @@ class TestTransferEngine implements TransferEngine {
             throw new TransferException(request.getRequestId(), "Transfer engine is shutdown");
         }
 
+        requests.add(request);
         maxConcurrentTransfers.accumulateAndGet(activeTransferCount.incrementAndGet(), Math::max);
         attempts.incrementAndGet();
         TransferJob job = new TransferJob(request);
@@ -136,6 +150,10 @@ class TestTransferEngine implements TransferEngine {
                     Thread.currentThread().interrupt();
                     throw new TransferException(request.getRequestId(), "Transfer interrupted");
                 }
+            }
+            String failing = failSourcesContaining;
+            if (failing != null && request.getSourceUri().toString().contains(failing)) {
+                return createFailureResult(request.getRequestId());
             }
             if (failuresBeforeSuccess.getAndUpdate(n -> Math.max(0, n - 1)) > 0) {
                 return createFailureResult(request.getRequestId());

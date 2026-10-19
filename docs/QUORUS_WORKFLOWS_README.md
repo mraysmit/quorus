@@ -2,8 +2,8 @@
 
 # Quorus Workflow README
 
-**Version:** 2.2  
-**Date:** 2026-10-03  
+**Version:** 2.4  
+**Date:** 2026-10-18  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Scope:** Current in-process workflow parser and execution behavior
@@ -131,9 +131,9 @@ The parser supports:
 
 ## Important Current Limitations
 
-- `condition` values are parsed and variable-resolved, but never evaluated: a guarded group or transfer always runs (register item `ENG-14`).
-- Transfer `options` are variable-resolved and then dropped; they are not passed to the transfer engine or protocol adapters, so they have no effect (register decision `DR-Q1`).
-- Variable references are resolved in a single pass. A reference inside a variable's value stays literal text.
+- A `condition` uses `success(name)`, `failure(name)`, `file_exists('path')`, `not`, `and` and `or`, and may name only upstream groups and their transfers; a false condition skips its group or transfer (the [YAML Syntax Guide](QUORUS_YAML_SYNTAX_GUIDE.md#conditions) gives the rules). A transfer cannot wait for another transfer of the same group.
+- Transfer `options` accept only `checksum` (verified by every adapter) and `expectedSize` (the progress total). Any other key fails validation (decision `DR-Q1`); the [YAML Syntax Guide](QUORUS_YAML_SYNTAX_GUIDE.md#options-map) gives the rules.
+- A reference inside a variable's value is resolved too, up to 10 levels; a cycle or deeper nesting fails the run.
 - `spec.variables` rank above the runtime variables a caller passes in the execution context, so a caller cannot override a value the YAML declares.
 - Older documentation that described rich workflow notifications, cleanup policies, SLA sections, or advanced credential models does not match the current parser.
 - The current parser does not accept a broad workflow spec vocabulary beyond the fields listed above.

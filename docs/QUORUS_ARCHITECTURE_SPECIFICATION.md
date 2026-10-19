@@ -2,8 +2,8 @@
 
 # Quorus Architecture Specification
 
-**Version:** 2.13  
-**Date:** 2026-10-03  
+**Version:** 2.14  
+**Date:** 2026-10-18  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Canonical and normative  
@@ -67,7 +67,7 @@ The status values in this table are normative:
 |---|---|---|
 | Core transfer engine | Implemented | Blocking execution through `SimpleTransferEngine`: each transfer runs on the calling thread under a concurrency limit, with retries |
 | HTTP/HTTPS, FTP/FTPS, SFTP, SMB/CIFS, NFS adapters | Implemented | Adapter features differ; resume is not generally available |
-| YAML workflow parsing and dependency execution | Implemented | Conditions are carried as resolved strings; there is no general condition engine |
+| YAML workflow parsing and dependency execution | Implemented | Group and transfer conditions are evaluated: `success`, `failure` and `file_exists` combined with `not`, `and` and `or`, naming only upstream groups and their transfers; a false condition skips. There is no general expression language |
 | Controller HTTP API | Implemented | Production profile requires TLS 1.3 client certificates, trusted identity resolution, policy middleware, and audit decisions; writes remain leader-only |
 | Complete REST control and operations interface | Partial | The live API covers a subset of the canonical transfer, workflow, tenant, service-connectivity, agent-lifecycle, security, audit, and administration contract |
 | Raft log, snapshots, and replicated controller state | Implemented | Membership is static and every node needs durable local storage |
@@ -836,7 +836,7 @@ The following decisions are effective with this specification:
 - [Enterprise implementation plan](../docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md) — phased delivery, verification, and exit gates
 - [OpenAPI contract](../quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml) — the current HTTP API, also served at `GET /api/v1/openapi.yaml`
 - [Docker guide](../docker/README.md) — development topologies, startup and verification
-- [Outstanding work register](../docs-design/task/QUORUS_OUTSTANDING_WORK_REGISTER.md) — every open task, gap traceability (§14) and decision
+- [Outstanding work register](../docs-design/task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-18.md) — every open task, gap traceability (§14) and decision
 - [Security deployment guide](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md) — implemented trust configuration
 - [Comprehensive system design](../docs-design/design/QUORUS_SYSTEM_DESIGN.md) — non-normative target-state vision
 - [Design and engineering document status](../docs-design/README.md) — how to read material under `docs-design`, including point-in-time reviews

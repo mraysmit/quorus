@@ -24,12 +24,7 @@ spec:
     workingDir: "/data/working"
     outputDir: "/data/output"
     archiveDir: "/data/archive"
-    
-    # Processing parameters
-    maxRetries: "3"
-    timeout: "120s"
-    chunkSize: "2048"
-    
+
   execution:
     dryRun: false
     virtualRun: false
@@ -43,23 +38,17 @@ spec:
       description: Download processing configuration and schemas
       continueOnError: false
       retryCount: 3
-      variables:
-        configTimeout: "60s"
       transfers:
         - name: download-config
           source: "{{configUrl}}"
           destination: "{{inputDir}}/config.json"
           protocol: http
-          options:
-            timeout: "{{configTimeout}}"
-            
+
         - name: download-schema
           source: "{{sourceUrl}}/xml"
           destination: "{{inputDir}}/schema.xml"
           protocol: http
-          options:
-            timeout: "{{configTimeout}}"
-    
+
     # Stage 2: Download raw data (parallel with configuration)
     - name: download-raw-data
       description: Download raw data files for processing
@@ -73,15 +62,14 @@ spec:
           destination: "{{inputDir}}/dataset-a.bin"
           protocol: http
           options:
-            chunkSize: "{{chunkSize}}"
-            maxRetries: "{{maxRetries}}"
-            
+            expectedSize: "{{dataSize}}"
+
         - name: download-dataset-b
           source: "{{sourceUrl}}/bytes/8192"
           destination: "{{inputDir}}/dataset-b.bin"
           protocol: http
           options:
-            chunkSize: "{{chunkSize}}"
+            expectedSize: 8192
             
         - name: download-dataset-c
           source: "{{sourceUrl}}/bytes/16384"
@@ -115,16 +103,12 @@ spec:
         - validate-data
       continueOnError: false
       retryCount: 2
-      variables:
-        processingMode: "batch"
       transfers:
         - name: process-dataset-a
           source: "{{workingDir}}/validated-a.bin"
           destination: "{{outputDir}}/processed-a-{{batchId}}.bin"
           protocol: file
-          options:
-            mode: "{{processingMode}}"
-            
+
         - name: process-dataset-b
           source: "{{workingDir}}/validated-b.bin"
           destination: "{{outputDir}}/processed-b-{{batchId}}.bin"

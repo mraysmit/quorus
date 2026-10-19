@@ -14,7 +14,6 @@ spec:
   variables:
     baseUrl: "https://httpbin.org"
     outputDir: "/tmp/downloads"
-    timeout: "30s"
     
   # Execution configuration
   execution:
@@ -35,20 +34,15 @@ spec:
           source: "{{baseUrl}}/json"
           destination: "{{outputDir}}/sample-data.json"
           protocol: http
-          options:
-            timeout: "{{timeout}}"
-            
+
         - name: download-xml-data
           source: "{{baseUrl}}/xml"
           destination: "{{outputDir}}/sample-data.xml"
           protocol: http
-          options:
-            timeout: "{{timeout}}"
-            
+
         - name: download-binary-data
           source: "{{baseUrl}}/bytes/1024"
           destination: "{{outputDir}}/sample-data.bin"
           protocol: http
           options:
-            timeout: "{{timeout}}"
-            chunkSize: 256
+            expectedSize: 1024

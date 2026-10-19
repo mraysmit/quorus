@@ -263,4 +263,52 @@ class VariableResolverTest {
         String result = resolver.resolve("{{specialChars}}");
         assertEquals("value with $pecial ch@rs & symbols!", result);
     }
+
+    @Test
+    void aReferenceInsideAVariablesValueIsResolved() {
+        resolver.setGlobalVariable("reportPath", "{{outputDir}}/reports");
+        resolver.setGlobalVariable("reportFile", "{{reportPath}}/ledger-{{version}}.csv");
+
+        assertEquals("/tmp/downloads/reports/ledger-1.0.csv", resolver.resolve("{{reportFile}}"));
+    }
+
+    @Test
+    void nestingUpToTheDepthLimitIsResolved() {
+        resolver.setGlobalVariable("v0", "end");
+        for (int i = 1; i <= VariableResolver.MAX_NESTING_DEPTH; i++) {
+            resolver.setGlobalVariable("v" + i, "{{v" + (i - 1) + "}}");
+        }
+
+        assertEquals("end", resolver.resolve("{{v" + VariableResolver.MAX_NESTING_DEPTH + "}}"));
+    }
+
+    @Test
+    void nestingDeeperThanTheLimitFails() {
+        resolver.setGlobalVariable("v0", "end");
+        for (int i = 1; i <= VariableResolver.MAX_NESTING_DEPTH + 1; i++) {
+            resolver.setGlobalVariable("v" + i, "{{v" + (i - 1) + "}}");
+        }
+
+        VariableResolver.VariableResolutionException failure = assertThrows(
+                VariableResolver.VariableResolutionException.class,
+                () -> resolver.resolve("{{v" + (VariableResolver.MAX_NESTING_DEPTH + 1) + "}}"));
+        assertTrue(failure.getMessage().contains("depth"), failure::getMessage);
+    }
+
+    @Test
+    void aCyclicReferenceFailsAndNamesTheCycle() {
+        resolver.setGlobalVariable("a", "x{{b}}");
+        resolver.setGlobalVariable("b", "y{{a}}");
+
+        VariableResolver.VariableResolutionException failure = assertThrows(
+                VariableResolver.VariableResolutionException.class, () -> resolver.resolve("{{a}}"));
+        assertTrue(failure.getMessage().contains("cycle: a -> b -> a"), failure::getMessage);
+    }
+
+    @Test
+    void theSameVariableUsedTwiceIsNotACycle() {
+        resolver.setGlobalVariable("dir", "{{outputDir}}");
+
+        assertEquals("/tmp/downloads|/tmp/downloads", resolver.resolve("{{dir}}|{{dir}}"));
+    }
 }

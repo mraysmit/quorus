@@ -141,8 +141,7 @@ public class BasicWorkflowExample {
                 spec:
                   variables:
                     fileSize: "1024"
-                    timeout: "30s"
-                    
+
                   execution:
                     dryRun: false
                     virtualRun: false
@@ -161,7 +160,7 @@ public class BasicWorkflowExample {
                           destination: "{{outputDir}}/test-file-small.bin"
                           protocol: http
                           options:
-                            timeout: "{{timeout}}"
+                            expectedSize: "{{fileSize}}"
                             
                         - name: download-json-data
                           source: "{{baseUrl}}/json"
@@ -179,7 +178,7 @@ public class BasicWorkflowExample {
                           destination: "{{outputDir}}/test-file-large.bin"
                           protocol: http
                           options:
-                            chunkSize: 512
+                            expectedSize: 2048
                 """;
     }
     

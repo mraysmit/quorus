@@ -2,8 +2,8 @@
 
 # Quorus Enterprise Implementation Plan
 
-**Version:** 1.44  
-**Date:** 2026-10-03  
+**Version:** 1.46  
+**Date:** 2026-10-18  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Active — remediation checkpoint open; R1-1 container-recreation acceptance closed 2026-09-07 while R1-2 and R1-3 remain open; Phase 0 functionally complete with M0 durability acceptance reopened until R1-2 and R1-3 close; Phase 1 complete; Phase 4 complete (the acceptance reopened on 2026-09-04 was restored by R2–R6 on 2026-09-05), with hardening follow-up `SEC-07` open; Phases 2 and 3 in progress; Phases 5–12 not started; platform migration (Section 20) in progress. CI has never passed; its repair is deferred (`ENG-07`, `SEQ-01`, Section 4)  
@@ -72,7 +72,7 @@ The baseline does not yet justify protected enterprise production use. Phase 1 e
 
 No milestone may be described as production ready solely because its feature list is complete.
 
-What is open and next is kept in the [Outstanding Work Register](QUORUS_OUTSTANDING_WORK_REGISTER.md) §2. The dated checkpoints below record findings and decisions, newest first.
+What is open and next is kept in the [Outstanding Work Register](QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-18.md) §2. The dated checkpoints below record findings and decisions, newest first.
 
 ### Documentation review findings — 2026-10-02
 
@@ -106,17 +106,25 @@ documentation work is in register Section H.
   `DELETE /api/v1/agents/{agentId}` on shutdown, the controller had no such route, and the agent
   treated the `404` as success, so the agent record stayed in replicated state. The route now
   exists; it is refused only while the agent holds active work.
-
-Decisions taken with the owner on 2026-10-03 (register §3) add two delivery items: `ENG-26`
-passes a defined set of workflow transfer options through and resolves nested variables
-(`DR-Q1`), and `ENG-27` makes agents follow leader hints, with the controller sending
-`X-Quorus-Leader` (`ENG-Q3`; delivered 2026-10-03). The order of the work is decision `SEQ-05`. The generated dependency
-inventory then showed that modules resolve different Jackson versions (`ENG-28`). Checking the built
-jars for `DR-Q5` showed that the agent image ships test-only libraries (`ENG-29`).
 - **No assignment scheduler runs in the controller.** Neither `JobAssignmentService` nor
   `AgentSelectionService` is constructed, so an assignment exists only through
   `POST /api/v1/assignments`. This is the existing `ENG-01`, settled with `P2-01`; the documents
   that present the scheduler as live are corrected under register DR-A9.
+
+Decisions taken with the owner on 2026-10-03 (register §3) add two delivery items: `ENG-26`
+passes a defined set of workflow transfer options through and resolves nested variables
+(`DR-Q1`), and `ENG-27` makes agents follow leader hints, with the controller sending
+`X-Quorus-Leader` (`ENG-Q3`; delivered 2026-10-03 in `e38e57c6`). The order of the work is
+decision `SEQ-05`. The generated dependency inventory then showed that modules resolve different
+Jackson versions (`ENG-28`, fixed in `98ff0314`). Checking the built jars for `DR-Q5` showed that
+the agent image ships test-only libraries (`ENG-29`, open).
+
+The remediation was committed on 2026-10-03: the documents in `8ee3ef98`; `SEC-09` and `SEC-11`
+in `caf2acb4`; `ENG-17`, `ENG-18` and `ENG-20` in `f0627fb6`; `ENG-19` in `bd9acf18`; `ENG-21` in
+`10e73a64`; `ENG-25` in `2bb7d665`; `DR-Q5` in `abc83ba5`; and `DR-Q4` in `85c039db`. `ENG-17`,
+`ENG-19` and `ENG-27` were verified with a stubbed entrypoint, a bare nginx container and a fake
+controller, not the shipped images; the end-to-end run on real containers is `ENG-30` (added
+2026-10-17, register Section I).
 
 Delivery items recorded only in the register until now are also part of this plan: `ENG-13`
 (workflow execution flags, closed), `ENG-14` (workflow conditions are never evaluated; a
@@ -147,7 +155,8 @@ The consequences are:
   applicable lane to pass, including documentation. Phases 1 and 4 closed on 2026-09-02 and
   2026-09-03, before this rule was recorded; they keep their status, but their exit evidence
   does not include a passing CI run, which `ENG-07` still owes them. The documentation lane's
-  header and link checks pass locally since 2026-10-03 (decision `DR-Q10`).
+  header and link checks pass since 2026-10-03 (decision `DR-Q10`, committed in `8ee3ef98`); the
+  FTPS port-21 failure in the unit lane remains.
 
 **Governed TLS trust anchors (`SEC-07`, decision `SEQ-02`).** This was found during `RT-03b`
 on 2026-09-26.
@@ -205,12 +214,12 @@ Raft mutual TLS: the controller becomes healthy, a certificate-authenticated rea
 succeeds, and a request without a client certificate is rejected during the TLS handshake. The
 image health check now follows the configured HTTP scheme and uses `/health/live`. This closes
 the repository configuration defect; it is not production PKI or deployment accreditation. Tracked as `CFG-01` in the
-[Outstanding Work Register](QUORUS_OUTSTANDING_WORK_REGISTER.md) Section I.
+[Outstanding Work Register](QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-18.md) Section I.
 
 **Documentation review delivery items — 2026-09-26:** The
 [2026-09-24 documentation review](../reviews/QUORUS_DOCUMENTATION_REVIEW_2026-09-24.md) found
 code and configuration defects alongside its documentation findings. The documentation work is
-[register Section H](QUORUS_OUTSTANDING_WORK_REGISTER.md#11-section-h--documentation-remediation), and its decisions are in the register's §3 decision log. The delivery work
+[register Section H](QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-18.md#11-section-h--documentation-remediation), and its decisions are in the register's §3 decision log. The delivery work
 is added to this plan and carried in register Section I: revocation-serial normalisation
 (`SEC-01`, code fixed, ADR-0009 outstanding) and node-local revocation scope (`SEC-02`); silent
 direct-URI SFTP host-key bypass (`SEC-03`); unbound Raft peer identity (`SEC-04`); first-match
@@ -758,6 +767,7 @@ Production transfer submission requires a service alias, remote path, and agent 
 Trust and protocol behavior fail closed: SFTP uses managed SHA-256 host-key pins and strict checking with password or ephemeral private-key authentication; HTTPS disables redirects and supports only Basic or Bearer authentication; FTPS protects control and data channels and supports password authentication. Governed HTTPS, FTPS, and SFTP connect their actual sockets to an address approved by the agent's repeated DNS policy. TLS adapters retain the original hostname for SNI and verification, perform normal PKIX, match approved CA identifiers against the validated chain including the selected trust anchor normally omitted by the server, apply optional leaf pins, and enforce the TLS floor. The staged validation model distinguishes policy-only validation from an optional bounded active route probe. Submission emits authorization evidence; last-use is emitted only after agent policy and secret resolution; time-based secret expiry is durably transitioned and audited before denial.
 
 Red-first tests cover the original delivery plus remediation of local filesystem escape, queued-endpoint substitution, destination URI credentials, pool/zone placement, socket-address binding, active route probing, omitted-root CA approval, authorization/use event semantics, and durable time-based secret expiry. The final clean seven-module reactor reported 2,303 tests with 2,302 passed, zero failures or errors, and one environment-limited skip (core 1,512; workflow 134; tenant 64; controller 502; agent 91; integration examples 0), generated every configured JaCoCo report, and passed every coverage gate. The skipped Windows symbolic-link escape case requires link-creation privilege unavailable on this host; canonical existing-parent escape and configured-root boundary coverage passed.
+
 ### Objective
 
 Ensure that agents connect only to approved enterprise services using verified peer identities, permitted network paths, and externally managed secrets.
@@ -1216,7 +1226,7 @@ The enterprise release candidate is approved only when all critical canonical ga
 
 ## 20. Platform Migration Workstreams
 
-**Status:** In progress. Direction accepted on 2026-09-26. `RT-01` to `RT-05` are complete, so of the default-build modules only `quorus-controller` still uses Vert.x. `RT-06` no longer waits for QRaft (`SEQ-03`, 2026-09-28) and starts with `RT-06a`; its prerequisite benchmark baselines B-08 and B-09 were recorded on 2026-09-28 (`ENG-15`). Workstream `CE` has not started. The state of both engines and the work per `CE` item are assessed in the [QRaft integration assessment](../design/QUORUS_QRAFT_INTEGRATION_ASSESSMENT.md) (2026-09-28), with open decisions `CE-Q1` to `CE-Q5`. Item status is kept in [register Section J](QUORUS_OUTSTANDING_WORK_REGISTER.md#13-section-j--platform-migration-workstreams)
+**Status:** In progress. Direction accepted on 2026-09-26. `RT-01` to `RT-05` are complete, so of the default-build modules only `quorus-controller` still uses Vert.x. `RT-06` no longer waits for QRaft (`SEQ-03`, 2026-09-28) and starts with `RT-06a`; its prerequisite benchmark baselines B-08 and B-09 were recorded on 2026-09-28 (`ENG-15`). Workstream `CE` has not started. The state of both engines and the work per `CE` item are assessed in the [QRaft integration assessment](../design/QUORUS_QRAFT_INTEGRATION_ASSESSMENT.md) (2026-09-28), with open decisions `CE-Q1` to `CE-Q5`. The assessment's dated update of 2026-10-03 (register DR-F20) records that QRaft has since implemented membership changes and moved to raftlog 1.4.1, so `CE-Q3` and `CE-Q4` are re-read against QRaft's current `main` before `CE` starts. Item status is kept in [register Section J](QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-18.md#13-section-j--platform-migration-workstreams)
 **Decisions:** [ADR-0011](../architecture-decisions/ADR-0011-CONSENSUS-VIA-QRAFT-GENERIC-ENGINE.md) (consensus through the generic QRaft engine) and [ADR-0012](../architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md) (leave Vert.x for Java 27 structured concurrency)
 
 These two workstreams change the platform beneath the phases rather than adding enterprise capability. Each item is delivered under Section 6.1 and must keep every delivered phase's boundary tests green. Neither workstream may weaken a delivered exit gate. In particular, Phase 1's controller-to-controller mutual TLS, peer rejection and revocation behaviour must pass unchanged through the new engine.
@@ -1235,7 +1245,7 @@ Quorus stops owning a Raft engine and consumes QRaft's engine through a 100% gen
 | **CE-06** | QRaft | Versioned artifacts | Engine artifacts published to a repository Quorus builds can resolve, with a compatibility and deprecation policy |
 | **CE-07** | Quorus | Engine adapter | `QuorusStateStore` implements the state-machine contract; the versioned protobuf command codec implements `CommandCodec`; engine errors map to the existing HTTP leader and conflict behaviour. It replaces the implementation behind the consensus interface that `RT-06a` introduces, so the controller's callers do not change |
 | **CE-08** | Quorus | Security wiring | `CertificateTrustState` and the Phase 1 trust configuration supply the TLS material and peer authorizer. Every Phase 1 Raft trust test passes through QRaft, and certificate-to-node-ID binding closes register item `SEC-04` |
-| **CE-09** | Quorus | Raft state migration | Establish on-disk compatibility between raftlog 1.2.0 and QRaft's raftlog version, and between Quorus's snapshot sidecar and QRaft's `SnapshotStore`. Deliver a tested coordinated cutover with rollback; no mixed-engine cluster |
+| **CE-09** | Quorus | Raft state migration | Establish on-disk compatibility between raftlog 1.2.0 and QRaft's raftlog version (1.4.1 at QRaft `caf101b` on 2026-10-03; `CE-Q4` decides whether this is a proof or a migration), and between Quorus's snapshot sidecar and QRaft's `SnapshotStore`. Deliver a tested coordinated cutover with rollback; no mixed-engine cluster |
 | **CE-10** | Quorus | Remove the in-repository engine | Delete Quorus's `RaftNode`, Raft gRPC server and transport, `RaftLogStorageAdapter`, the snapshot sidecar and the direct `raftlog-core` dependency. Keep the command protobuf schemas |
 | **CE-11** | Quorus | Re-establish durability evidence | Repeat R1-1 and the Raft failure, restart and snapshot lanes on the QRaft-based build. R1-2 and R1-3 are run once, against this build |
 
@@ -1292,7 +1302,7 @@ Architecture, security, operations, quality, and product/domain owners participa
 
 ## 22. Gap-to-Phase Traceability
 
-This table assigns each gap to its delivery phases. Current closure status is maintained in [register §14](QUORUS_OUTSTANDING_WORK_REGISTER.md#14-gap-to-section-traceability), not here.
+This table assigns each gap to its delivery phases. Current closure status is maintained in [register §14](QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-18.md#14-gap-to-section-traceability), not here.
 
 | Gap | Delivery phase |
 |---|---|
@@ -1370,6 +1380,8 @@ The plan is revised when requirements or implementation evidence change. Revisio
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.46 | 2026-10-18 | Links repointed to the register's dated filename, `QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-18.md` (register v1.29, governance rule 7: the register's filename carries the date of its last update) |
+| 1.45 | 2026-10-17 | §4: the 2026-10-02 findings list is one list again, and the commits of 2026-10-03 are cited for the delivered items (`SEC-09`, `SEC-11`, `ENG-17` to `ENG-21`, `ENG-25`, `ENG-27`, `ENG-28`, `DR-Q4`, `DR-Q5`, `DR-Q10`); new delivery item `ENG-30`, the end-to-end run on real containers that `ENG-17`, `ENG-19` and `ENG-27` did not include. §20: the status note and `CE-09` record QRaft's move to raftlog 1.4.1 and membership changes (register DR-F20), to be read against `CE-Q3` and `CE-Q4`. Register v1.28 is cited |
 | 1.44 | 2026-10-03 | §4: findings of the 2026-10-02 documentation review added as delivery items `SEC-09` to `SEC-11` and `ENG-17` to `ENG-25`, with `SEC-09` taken first; the §1 description of the System Design updated after its split (DR-C5); `ENG-01` restated (no assignment scheduler runs); `ENG-13` to `ENG-16`, `OBS-15` and `STATUS-01` brought into the plan. Corrections (register DR-B9): the §20 status line said `RT-06` waits for `CE-07` to `CE-11`, contradicting `SEQ-03`; the `CE-07` acceptance and §20 sequencing steps 2 and 3 described a Vert.x bridge and an order that `SEQ-03` replaced; §3 still listed uncontrolled service connectivity as a blocker after Phase 4; Phase 2 listed the closed `ARCH-06` and `ARCH-17`; §4 now states how `SEQ-01` applies to Phases 1 and 4, which closed before it. §4 now opens with the milestone table, followed by the dated checkpoints, and points to register §2 for what is open. §6 Definition of Done gains the contract-documentation rule (register DR-D5). Scope note on v1.43: its removal of the retained-digest Definition of Done bullet and the Phase 0 release-manifest deliverable was a scope change, not a simplification |
 | 1.43 | 2026-10-02 | §6 Definition of Done, §6.1, the Phase 0 deliverables and §24 simplified: a slice's record is its commit message (`DR-Q6`); checkpoint wording tidied |
 | 1.42 | 2026-09-28 | §20: `RT-06` re-sequenced to proceed before QRaft, in slices `RT-06a` (consensus interface) to `RT-06d`; only the in-repository Raft engine stays on Vert.x until `CE-10` |

@@ -2,8 +2,8 @@
 
 # Quorus YAML Syntax Guide
 
-**Version:** 2.4  
-**Date:** 2026-10-03  
+**Version:** 2.6  
+**Date:** 2026-10-18  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0
 
@@ -90,8 +90,10 @@ Both require all seven metadata fields below; schema validation also requires `s
 | `spec.execution.strategy` | `sequential` or `parallel` | Engine |
 | `spec.transferGroups` | Group names unique | Engine |
 | `spec.transferGroups` | An empty or missing list is a warning | Both |
+| `transfers[].options` | Only `checksum` and `expectedSize`, each with a valid literal value; see [Options Map](#options-map) | Engine |
+| `condition` (group or transfer) | In the condition grammar, naming only upstream groups and their transfers; see [Conditions](#conditions) | Engine |
 
-Validation does not check option keys, protocol names, or `retryCount` bounds. The JSON schema file in `quorus-workflow/src/main/resources/schema/` is not loaded by any code, so its stricter rules are not enforced.
+Validation does not check protocol names or `retryCount` bounds. The JSON schema file in `quorus-workflow/src/main/resources/schema/` is not loaded by any code, so its stricter rules are not enforced.
 
 ---
 
@@ -162,12 +164,10 @@ spec:
   variables:
     baseUrl: "https://httpbin.org"
     outputDir: "/tmp/downloads"
-    timeout: "30s"
-    maxRetries: "3"
-    chunkSize: "2048"
+    reportDir: "{{outputDir}}/reports"
 ```
 
-A variable's value is inserted as it is written: references inside a variable's value are not resolved. See [Variable Nesting](#variable-nesting).
+A reference inside a variable's value is resolved too, so `reportDir` above becomes `/tmp/downloads/reports`. See [Variable Nesting](#variable-nesting).
 
 ---
 
@@ -233,7 +233,7 @@ An ordered list of transfer groups. Each group contains transfers and can declar
 | `name` | **Yes** | — | string | Group identifier. Must be non-empty. Used as the node name in the dependency graph. |
 | `description` | No | `null` | string | Human-readable description. |
 | `dependsOn` | No | `[]` | list of strings | Names of groups that must complete before this group runs. |
-| `condition` | No | `null` | string | Condition expression. Parsed and variable-resolved, but the current engine does not evaluate conditions — it carries the resolved string through execution. |
+| `condition` | No | `null` | string | The group runs only if this holds when its dependencies have finished; otherwise it is skipped. See [Conditions](#conditions). |
 | `variables` | No | `null` | map | Group-scoped variables. These are merged on top of global variables during resolution (group variables take precedence). |
 | `continueOnError` | No | `false` | boolean | When `true`, workflow continues to dependent groups even if this group fails. |
 | `retryCount` | No | `0` | integer | How many more times each failed transfer of the group is run before it counts as failed. A negative value is treated as 0; there is no upper bound. Each run is a full transfer, with the transfer engine's own retries inside it. |
@@ -334,8 +334,8 @@ Individual transfer definitions within a group.
 | `source` | **Yes** | — | string | Source URI or path. Supports `{{variable}}` substitution. |
 | `destination` | **Yes** | — | string | Destination path or URI. Supports `{{variable}}` substitution. |
 | `protocol` | No | `"http"` | string | Protocol identifier used by `ProtocolFactory` to select the adapter. |
-| `options` | No | `{}` | map | Arbitrary key-value options map. String values are variable-resolved. **Options currently have no effect**: they are not passed to the transfer engine or protocol adapter (see [Options Map](#options-map)). |
-| `condition` | No | `null` | string | Condition expression. Parsed and variable-resolved but not evaluated by the current engine. |
+| `options` | No | `{}` | map | `checksum` and `expectedSize` only; any other key fails validation. String values are variable-resolved. See [Options Map](#options-map). |
+| `condition` | No | `null` | string | The transfer starts only if this holds when its group starts; otherwise it is skipped. See [Conditions](#conditions). |
 
 ### Protocol Values Used in Real YAML
 
@@ -353,31 +353,16 @@ The actually registered protocol adapters in `ProtocolFactory.registerDefaultPro
 
 ### Options Map
 
-The `options` map is freeform — the parser does not validate option keys. String values go through variable resolution, so an option that names an undefined variable still fails the run. After that, the options are dropped: `TransferGroup.toTransferRequest()` builds the transfer request from `source`, `destination` and `protocol` only. Setting `timeout`, `chunkSize`, `maxRetries` or any other option therefore changes nothing. Whether options will be passed through is open decision `DR-Q1` in the [Outstanding Work Register](../docs-design/task/QUORUS_OUTSTANDING_WORK_REGISTER.md).
+A transfer accepts two options. Each one sets a field of the transfer request that the transfer engine or every protocol adapter acts on, so no option is accepted and then ignored:
 
-These are the option keys used in the real YAML files:
+| Option | Value | Effect |
+|--------|-------|--------|
+| `checksum` | The expected SHA-256 of the file, as 64 hexadecimal digits in either case | Every adapter computes the SHA-256 of the transferred file and fails the transfer if it differs. The value is passed in lower case, which is the form the adapters compute |
+| `expectedSize` | The file's size in bytes, a whole number of zero or more, as a number or a quoted string | The engine reports it as the transfer's total size, so progress has a known end. It is not compared with the bytes transferred |
 
-| Option Key | Example Value | Appears In |
-|------------|---------------|------------|
-| `timeout` | `"30s"`, `"{{timeout}}"` | `simple-download.yaml`, `data-pipeline.yaml` |
-| `chunkSize` | `256`, `"{{chunkSize}}"` | `simple-download.yaml`, `data-pipeline.yaml` |
-| `maxRetries` | `5`, `"{{maxRetries}}"` | `simple-workflow.yaml`, `data-pipeline.yaml` |
-| `batchSize` | `"{{batchSize}}"` | `ecommerce-order-processing.yaml` |
-| `validateCertificate` | `true` | `schema-compliant-example.yaml` |
-| `executable` | `true` | `schema-compliant-example.yaml` |
-| `query` | SQL string | `financial-reporting.yaml` |
-| `format` | `"pdf"` | `financial-reporting.yaml` |
-| `template` | `"executive-summary"` | `financial-reporting.yaml` |
-| `template_data` | file path | `financial-reporting.yaml` |
-| `compliance_type` | `"sox"` | `financial-reporting.yaml` |
-| `period` | date range string | `financial-reporting.yaml` |
-| `audit_type` | `"financial_report"` | `financial-reporting.yaml` |
-| `transformation` | `"reconciliation"` | `financial-reporting.yaml` |
-| `recursive` | `true` | `financial-reporting.yaml` |
-| `compress` | `true` | `financial-reporting.yaml` |
-| `subject` | email subject string | `financial-reporting.yaml` |
+Any other key fails validation with an error naming the key, for example `spec.transferGroups[0].transfers[1].options.timeout`, and no transfer of that workflow starts. Options that other tools or older versions of these examples used, such as `timeout`, `chunkSize`, `maxRetries` or `validateCertificate`, are refused for that reason: nothing would act on them.
 
-None of these keys has any effect today. Treat them as documentation of intent in the example files.
+A literal value is checked at validation. A value that contains a variable reference is resolved first and checked when the transfer request is built. If it is then invalid, that transfer fails before it starts, and the transfer engine is never called for it.
 
 **Example — transfer with options from `simple-download.yaml`:**
 
@@ -388,8 +373,24 @@ transfers:
     destination: "{{outputDir}}/sample-data.bin"
     protocol: http
     options:
-      timeout: "{{timeout}}"
-      chunkSize: 256
+      expectedSize: 1024
+```
+
+**Example — a checksum from a variable:**
+
+```yaml
+spec:
+  variables:
+    ledgerSha256: "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+  transferGroups:
+    - name: fetch-ledger
+      transfers:
+        - name: download-ledger
+          source: "https://files.example.com/ledger.csv"
+          destination: "/data/in/ledger.csv"
+          protocol: https
+          options:
+            checksum: "{{ledgerSha256}}"
 ```
 
 **Example — transfer with condition from `simple-workflow.yaml`:**
@@ -426,7 +427,7 @@ The resolver processes these fields:
 - `transfers[].source`
 - `transfers[].destination`
 - `transfers[].condition`
-- `transfers[].options` (string values only; options have no effect after resolution)
+- `transfers[].options` (string values only)
 - `transferGroups[].condition`
 
 Variables in `metadata` fields, group `name`, and transfer `name` are **not** resolved.
@@ -439,47 +440,92 @@ Groups can declare their own variables that override global variables within tha
 # From data-pipeline.yaml:
 spec:
   variables:
-    timeout: "120s"
+    sourceUrl: "https://httpbin.org"
 
   transferGroups:
-    - name: download-configuration
+    - name: download-raw-data
       variables:
-        configTimeout: "60s"      # only visible to transfers in this group
+        dataSize: "4096"          # only visible to transfers in this group
       transfers:
-        - name: download-config
-          source: "{{configUrl}}"
-          destination: "{{inputDir}}/config.json"
+        - name: download-dataset-a
+          source: "{{sourceUrl}}/bytes/{{dataSize}}"
+          destination: "{{inputDir}}/dataset-a.bin"
           protocol: http
           options:
-            timeout: "{{configTimeout}}"   # resolves to "60s"
+            expectedSize: "{{dataSize}}"   # resolves to 4096
 ```
 
 ### Variable Nesting
 
-Resolution is a single pass. A reference in a field is replaced by the variable's value exactly as written, and any `{{...}}` inside that value is left as literal text, with no error. For example, `financial-reporting.yaml` declares:
+A reference inside a variable's value is resolved in turn, from the same sources and in the same precedence order. For example, `financial-reporting.yaml` declares:
 
 ```yaml
 spec:
   variables:
+    reportPath: "/reports/monthly"
     reportMonth: "{{current_month}}"
 ```
 
-A destination of `"{{reportPath}}/raw/general-ledger-{{reportMonth}}.csv"` therefore resolves to a path containing the literal text `{{current_month}}`, even if `current_month` is set in the environment. Supply the final value directly, for example through the execution context or the environment, and reference that variable in the field. Whether nested references will be resolved is open decision `DR-Q1`.
+A destination of `"{{reportPath}}/raw/general-ledger-{{reportMonth}}.csv"` resolves `reportMonth`, then `current_month`. `current_month` is not declared in the file, so the execution context or the environment must supply it; if nothing does, the run fails with `Variable not found: current_month`.
+
+Nesting is limited to 10 levels: a reference inside a value inside a value, and so on, ten times. Resolution fails with an error naming the chain when:
+
+- the nesting is deeper than 10 levels; or
+- the references form a cycle, for example `a: "{{b}}"` and `b: "{{a}}"`, reported as `Variable references form a cycle: a -> b -> a`.
+
+Using the same variable more than once in one field is not a cycle.
 
 ---
 
-## Condition Strings
+## Conditions
 
-Both transfer groups and individual transfers support a `condition` field. The parser reads and variable-resolves the condition string, but the current workflow engine **does not evaluate conditions**. The resolved string is carried through execution unchanged.
+A transfer group and a transfer may each have a `condition`. A group's condition is evaluated when its dependencies have finished, just before it would start. A transfer's condition is evaluated when its group starts. If the condition holds, the group or transfer runs; if not, it is **skipped**.
 
-Condition patterns used in real YAML files:
+### Grammar
 
-| Pattern | Example | Source File |
-|---------|---------|-------------|
-| `success(group-or-transfer-name)` | `"success(download-base-files)"` | `simple-workflow.yaml` |
-| `file_exists('path')` | `"file_exists('{{configDir}}/postgresql.conf')"` | `schema-compliant-example.yaml`, `data-pipeline.yaml`, `ecommerce-order-processing.yaml` |
+| Form | True when |
+|------|-----------|
+| `success(name)` | The group or transfer `name` ran and succeeded |
+| `failure(name)` | The group or transfer `name` ran and failed |
+| `file_exists('path')` | The path exists on the filesystem of the machine running the workflow engine. Double quotes also work: `file_exists("path")` |
+| `not X` | `X` is false |
+| `X and Y` | Both hold |
+| `X or Y` | Either holds |
+| `( X )` | Grouping |
 
-These are conventions in the YAML files, not evaluated expressions: a guarded transfer runs whether or not its condition would hold. Whether conditions will be evaluated or rejected is open item `ENG-14` in the [Outstanding Work Register](../docs-design/task/QUORUS_OUTSTANDING_WORK_REGISTER.md).
+`not` binds tightest, then `and`, then `or`, so `not a and b or c` means `((not a) and b) or c`. Keywords are lower case, and spaces are free. A name is letters, digits, `-`, `_` and `.`. Both `success` and `failure` are false for something that was skipped.
+
+A variable reference is allowed only inside a `file_exists` path, which is resolved before the condition is evaluated. A relative path is relative to the engine's working directory. Names must be literal, so that validation can check them.
+
+### What a condition may name
+
+Engine validation refuses a condition that is outside the grammar, and one that names anything except:
+
+- a group that this group depends on, directly or through other groups; or
+- a transfer of such a group.
+
+A transfer of the **same** group cannot be named, because the transfers of a group run in parallel: when the condition is evaluated, the other transfer has not finished. To make one transfer wait for another, put it in a later group that depends on the first. A name must also be unambiguous: a name used by both a group and a transfer, or by transfers in two groups, cannot be named.
+
+`failure(x)` can be true only if `x`'s group sets `continueOnError: true`. Without it, the workflow stops when that group fails, and no later group runs. Validation gives a warning for such a condition.
+
+### Skipping
+
+- A skipped group's status is `SKIPPED` and none of its transfers run. A skipped transfer has no result and is listed in its group's `skippedTransfers`.
+- A skip is not a failure: the workflow can still complete, and the groups that depend on a skipped group still run, subject to their own conditions.
+- A condition that cannot be evaluated at run time fails its group or transfer, which does not start. This happens when a resolved `file_exists` path contains the quote that encloses it, or is not a valid path.
+- A virtual run evaluates conditions against its simulated outcomes, in which every transfer succeeds. A dry run does not evaluate conditions: it reports every transfer as succeeded.
+
+**Examples from the example workflows:**
+
+```yaml
+# ecommerce-order-processing.yaml: a transfer that runs only if an upstream transfer succeeded
+- name: reserve-inventory
+  condition: "success(verify-payment-status)"   # verify-payment-status is in process-payments, a dependency
+
+# data-pipeline.yaml: a transfer that runs only if a file is present
+- name: validate-dataset-a
+  condition: "file_exists('{{inputDir}}/config.json')"
+```
 
 ---
 
@@ -577,12 +623,12 @@ The examples module's `WorkflowValidationCLI` runs schema validation from the co
 
 | File | Description | Groups | Key Features |
 |------|-------------|--------|--------------|
-| `simple-download.yaml` | HTTP file downloads | 1 | Basic options, variable substitution |
-| `simple-workflow.yaml` | Dependency chains | 3 | `dependsOn`, group variables, conditions, `maxRetries` |
-| `data-pipeline.yaml` | Multi-stage ETL | 5+ | Parallel strategy, group-scoped variables, `continueOnError` |
-| `schema-compliant-example.yaml` | Database config setup | 4 | HTTPS with `validateCertificate`, `condition` with `file_exists` |
-| `ecommerce-order-processing.yaml` | Order processing pipeline | 5+ | `batchSize` option from a variable, `file_exists` conditions |
-| `financial-reporting.yaml` | Monthly reporting | 6 | Nested variable references (left literal; see [Variable Nesting](#variable-nesting)), compliance options, non-adapter protocols |
+| `simple-download.yaml` | HTTP file downloads | 1 | The `expectedSize` option, variable substitution |
+| `simple-workflow.yaml` | Dependency chains | 3 | `dependsOn`, group variables, conditions, `expectedSize` from a variable |
+| `data-pipeline.yaml` | Multi-stage ETL | 5+ | Parallel strategy, group-scoped variables, `continueOnError`, `expectedSize` |
+| `schema-compliant-example.yaml` | Database config setup | 4 | HTTPS downloads, `condition` with `file_exists` |
+| `ecommerce-order-processing.yaml` | Order processing pipeline | 7 | `success` and `file_exists` conditions, a group split so that one transfer waits for another, non-adapter protocols |
+| `financial-reporting.yaml` | Monthly reporting | 8 | Nested variable references that the execution context must complete (see [Variable Nesting](#variable-nesting)), `success` conditions on upstream transfers, non-adapter protocols |
 
 These files are in `quorus-integration-examples/src/main/resources/workflows/` and `quorus-workflow/src/test/resources/`.
 

@@ -157,11 +157,6 @@ public class ComplexWorkflowExample {
                 
                 spec:
                   variables:
-                    # Global configuration
-                    maxRetries: "3"
-                    timeout: "60s"
-                    chunkSize: "1024"
-                    
                     # Data sources
                     rawDataUrl: "{{baseUrl}}/bytes"
                     configUrl: "{{baseUrl}}/json"
@@ -191,9 +186,7 @@ public class ComplexWorkflowExample {
                           source: "{{configUrl}}"
                           destination: "{{rawDir}}/{{configFile}}"
                           protocol: http
-                          options:
-                            timeout: "{{timeout}}"
-                            
+
                         - name: download-schema-config
                           source: "{{baseUrl}}/xml"
                           destination: "{{rawDir}}/schema.xml"
@@ -212,8 +205,7 @@ public class ComplexWorkflowExample {
                           destination: "{{rawDir}}/dataset-1.bin"
                           protocol: http
                           options:
-                            chunkSize: "{{chunkSize}}"
-                            maxRetries: "{{maxRetries}}"
+                            expectedSize: "{{dataSize}}"
                             
                         - name: download-dataset-2
                           source: "{{rawDataUrl}}/4096"

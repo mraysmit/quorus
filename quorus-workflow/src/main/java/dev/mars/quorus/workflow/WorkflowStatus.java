@@ -35,10 +35,13 @@ public enum WorkflowStatus {
     
     FAILED,
     
-    CANCELLED;
-    
+    CANCELLED,
+
+    /** A transfer group whose condition was false: none of its transfers ran. Not a failure. */
+    SKIPPED;
+
     public boolean isTerminal() {
-        return this == COMPLETED || this == FAILED || this == CANCELLED;
+        return this == COMPLETED || this == FAILED || this == CANCELLED || this == SKIPPED;
     }
     
     public boolean isActive() {

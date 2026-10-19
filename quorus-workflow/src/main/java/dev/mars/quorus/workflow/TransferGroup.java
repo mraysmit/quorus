@@ -162,15 +162,19 @@ public class TransferGroup {
         }
         
         /**
-         * Converts this transfer definition to a TransferRequest.
-         * Variables should be resolved before calling this method.
+         * Converts this transfer definition to a TransferRequest, carrying its options into the
+         * request fields they name (see {@link TransferOptions}). Variables should be resolved
+         * before calling this method.
+         *
+         * @throws IllegalArgumentException if the source, the destination or an option is invalid
          */
         public TransferRequest toTransferRequest() {
+            TransferRequest.Builder request = TransferRequest.builder().protocol(protocol);
+            TransferOptions.apply(options, request);
             try {
-                return TransferRequest.builder()
+                return request
                         .sourceUri(java.net.URI.create(source))
                         .destinationPath(java.nio.file.Paths.get(destination))
-                        .protocol(protocol)
                         .build();
             } catch (Exception e) {
                 throw new IllegalArgumentException("Invalid source URI or destination path", e);

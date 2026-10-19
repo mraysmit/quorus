@@ -84,15 +84,14 @@ class SchemaValidationIntegrationTest {
                           continueOnError: false
                           retryCount: 3
                           variables:
-                            initTimeout: "30s"
+                            setupSize: "512"
                           transfers:
                             - name: setup-directories
                               source: "{{apiUrl}}/setup"
                               destination: "{{dataPath}}/setup.json"
                               protocol: https
                               options:
-                                timeout: "{{initTimeout}}"
-                                validateCertificate: true
+                                expectedSize: "{{setupSize}}"
                                 
                         - name: data-ingestion
                           description: Ingest test data
@@ -124,7 +123,7 @@ class SchemaValidationIntegrationTest {
                               destination: "{{dataPath}}/processed.json"
                               protocol: file
                               options:
-                                chunkSize: "{{batchSize}}"
+                                expectedSize: "{{batchSize}}"
                                 
                         - name: validation
                           description: Validate processed results

@@ -2,8 +2,8 @@
 
 # Quorus User Guide
 
-**Version:** 2.6  
-**Date:** 2026-10-03  
+**Version:** 2.8  
+**Date:** 2026-10-18  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Scope:** Current implementation guide
@@ -61,7 +61,7 @@ The workflow module supports:
 - dry run execution
 - virtual run execution
 
-The workflow engine validates every workflow before running it, then executes transfer groups in dependency order. YAML `condition` values are parsed and resolved but never evaluated, and transfer `options` have no effect; the [YAML Syntax Guide](QUORUS_YAML_SYNTAX_GUIDE.md) lists the validation rules and these limits.
+The workflow engine validates every workflow before running it, then executes transfer groups in dependency order. A group or transfer whose YAML `condition` is false is skipped. Transfer `options` accept only `checksum` and `expectedSize`, and any other key fails validation; the [YAML Syntax Guide](QUORUS_YAML_SYNTAX_GUIDE.md) lists the validation rules and these limits.
 
 ### Controller API
 
@@ -125,7 +125,7 @@ Current implementation supports:
 - direct HTTP download and upload paths
 - streaming execution on Apache HttpClient 5, with governed address pinning
 
-Workflow transfer `options` are not passed to the adapter.
+A workflow transfer's `checksum` option reaches the adapter, which verifies the SHA-256 of the transferred file against it.
 
 Do **not** assume the current implementation provides:
 

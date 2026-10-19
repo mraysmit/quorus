@@ -35,7 +35,6 @@ spec:
     errorPath: "/errors/orders"
     
     # Processing settings
-    batchSize: "500"
     timeout: "30s"
     retryAttempts: "3"
     
@@ -52,17 +51,12 @@ spec:
       description: Process pending payment verifications
       continueOnError: false
       retryCount: 3
-      variables:
-        paymentTimeout: "60s"
       transfers:
         - name: fetch-pending-payments
           source: "{{ordersApi}}/payments/pending"
           destination: "{{dataPath}}/pending-payments.json"
           protocol: https
-          options:
-            timeout: "{{paymentTimeout}}"
-            batchSize: "{{batchSize}}"
-            
+
         - name: verify-payment-status
           source: "{{paymentApi}}/verify"
           destination: "{{dataPath}}/verified-payments.json"
@@ -87,9 +81,7 @@ spec:
           destination: "{{inventoryDb}}/reservations"
           protocol: database
           condition: "success(verify-payment-status)"
-          options:
-            transactional: true
-            
+
         - name: update-inventory-counts
           source: "{{inventoryDb}}/reservations"
           destination: "{{inventoryDb}}/current_stock"
@@ -161,9 +153,7 @@ spec:
           source: "{{dataPath}}/order-metrics.json"
           destination: "{{analyticsDb}}/daily_orders"
           protocol: database
-          options:
-            upsert: true
-            
+
         - name: trigger-reporting-update
           source: "{{analyticsDb}}/daily_orders"
           destination: "{{notificationApi}}/internal/reporting"
@@ -181,14 +171,22 @@ spec:
           source: "{{dataPath}}/verified-payments.json"
           destination: "{{archivePath}}/orders-{{timestamp}}.json"
           protocol: file
-          
+
+        - name: log-processing-summary
+          source: "{{analyticsDb}}/daily_orders"
+          destination: "/logs/order-processing-{{timestamp}}.log"
+          protocol: file
+
+    # Remove temporary data only once the archive has succeeded. A condition can name only a group
+    # this one depends on, or its transfers: transfers of one group run in parallel.
+    - name: cleanup-temp-data
+      description: Remove temporary order data after a successful archive
+      dependsOn:
+        - cleanup-and-archive
+      continueOnError: true
+      transfers:
         - name: cleanup-temp-files
           source: "{{dataPath}}/pending-payments.json"
           destination: "/dev/null"
           protocol: file
           condition: "success(archive-processed-orders)"
-          
-        - name: log-processing-summary
-          source: "{{analyticsDb}}/daily_orders"
-          destination: "/logs/order-processing-{{timestamp}}.log"
-          protocol: file
