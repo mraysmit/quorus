@@ -7,7 +7,7 @@
 **Prepared for:** Mark Ray-Smith — Cityline Ltd  
 **Prepared by:** Claude (Cowork), documentation and code cross-check  
 **License:** Apache 2.0  
-**Status:** Point-in-time review. Findings apply to HEAD `216348a` (2026-09-07) plus the uncommitted working tree as observed on 2026-09-24. Remediation progress is tracked in the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-18.md#11-section-h--documentation-remediation) (Section H, and Section I for code defects), not here.  
+**Status:** Point-in-time review. Findings apply to HEAD `216348a` (2026-09-07) plus the uncommitted working tree as observed on 2026-09-24. Remediation progress is tracked in the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md#11-section-h--documentation-remediation) (Section H, and Section I for code defects), not here.  
 **Scope:** Live documentation. That is `docs/`, `docs-design/` except `archive/`, the root and module READMEs, ADRs, runbooks and repo-meta documents.
 
 ---
@@ -249,7 +249,7 @@ Sizes are on-disk sizes. "Header" gives the version and date in the document's o
 | Document | Size | Header | Grade | Currency | Action and main reason |
 |---|---|---|---|---|---|
 | `task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md` | 89.6 KB | v1.26, 09-07 (uncommitted) | C+ | Partly stale | **Fix.** The header says Phase 4 is "reopened" while §11 says Complete. It cites five orphaned SHAs, lacks the revision history that its §23 requires, and presents a present-tense "no volumes" statement that has since been fixed. |
-| `task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-18.md` | 39.2 KB | v1.3, 09-07 (uncommitted) | B− | Partly stale | **Fix.** OBS-04, OBS-05, OBS-07 and OBS-14 are stale against the code. The section counts are wrong (F: 8 vs 10 rows; H: 6 open vs 0 open). It cites plan v1.25 instead of v1.26. Three plan items have no ID. |
+| `task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md` | 39.2 KB | v1.3, 09-07 (uncommitted) | B− | Partly stale | **Fix.** OBS-04, OBS-05, OBS-07 and OBS-14 are stale against the code. The section counts are wrong (F: 8 vs 10 rows; H: 6 open vs 0 open). It cites plan v1.25 instead of v1.26. Three plan items have no ID. |
 
 ### 3.6 `docs-design/design/`
 

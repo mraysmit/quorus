@@ -9,7 +9,7 @@
 **Status:** Assessment, read-only on the QRaft side. It records where both engines stand and what workstream
 `CE` has to do. Decisions are taken in [ADR-0011](../architecture-decisions/ADR-0011-CONSENSUS-VIA-QRAFT-GENERIC-ENGINE.md)
 and tracked as items `CE-01` to `CE-11` and decisions `CE-Q1` to `CE-Q5` in the
-[register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-18.md).  
+[register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md).  
 **Observed:** QRaft `main` at `1bab473` (with uncommitted test changes; the owner is still changing it) and
 Quorus after `RT-05`. Sections 1 to 5 describe that snapshot; the update below records what has changed since.
 

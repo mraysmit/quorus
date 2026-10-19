@@ -2192,7 +2192,7 @@ docker logs quorus-loadbalancer --tail 50
 - **[Canonical Architecture Specification](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md)** - Current guarantees, boundaries, and release requirements
 - **[Canonical REST API Specification](../../docs/QUORUS_REST_API_SPECIFICATION.md)** - Complete control, operations, security, and administration API contract
 - **[Enterprise Implementation Plan](../task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md)** - Phased delivery, dependencies, verification, and exit gates
-- **[Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-18.md)** - Every open task cited here (`ENG-*`, `SEC-*`, `ARCH-*`, `P2-*`, `RT-*`, `CE-*`)
+- **[Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md)** - Every open task cited here (`ENG-*`, `SEC-*`, `ARCH-*`, `P2-*`, `RT-*`, `CE-*`)
 - **[OpenAPI contract](../../quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml)** - The current HTTP API, also served at `GET /api/v1/openapi.yaml`
 - **[YAML Syntax Guide](../../docs/QUORUS_YAML_SYNTAX_GUIDE.md)** - Accepted workflow syntax
 - **[Docker guide](../../docker/README.md)** - Building images and running the compose topologies

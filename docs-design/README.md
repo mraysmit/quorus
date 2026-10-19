@@ -22,7 +22,7 @@ The controlling documents are:
 
 The current phased delivery roadmap is [Quorus Enterprise Implementation Plan](task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md). It sequences the canonical requirements but does not override them.
 
-Outstanding work across every planning document is consolidated in the [Quorus Outstanding Work Register](task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-18.md). The register is the single task list: it holds the documentation remediation from the 2026-09-24 and 2026-10-02 reviews (Section H) and a decision log (§3). The alpha plan, Stage 6 security and routes plan, OpenTelemetry plan, sealed-record design and configuration isolation handover are in `archive/`, with their open items carried into the register.
+Outstanding work across every planning document is consolidated in the [Quorus Outstanding Work Register](task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md). The register is the single task list: it holds the documentation remediation from the 2026-09-24 and 2026-10-02 reviews (Section H) and a decision log (§3). The alpha plan, Stage 6 security and routes plan, OpenTelemetry plan, sealed-record design and configuration isolation handover are in `archive/`, with their open items carried into the register.
 
 The record of each implementation slice is its commit message (decision `DR-Q6`); there is no separate evidence directory.
 

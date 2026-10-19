@@ -836,7 +836,7 @@ The following decisions are effective with this specification:
 - [Enterprise implementation plan](../docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md) — phased delivery, verification, and exit gates
 - [OpenAPI contract](../quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml) — the current HTTP API, also served at `GET /api/v1/openapi.yaml`
 - [Docker guide](../docker/README.md) — development topologies, startup and verification
-- [Outstanding work register](../docs-design/task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-18.md) — every open task, gap traceability (§14) and decision
+- [Outstanding work register](../docs-design/task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md) — every open task, gap traceability (§14) and decision
 - [Security deployment guide](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md) — implemented trust configuration
 - [Comprehensive system design](../docs-design/design/QUORUS_SYSTEM_DESIGN.md) — non-normative target-state vision
 - [Design and engineering document status](../docs-design/README.md) — how to read material under `docs-design`, including point-in-time reviews

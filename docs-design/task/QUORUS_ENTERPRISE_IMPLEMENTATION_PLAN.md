@@ -72,7 +72,7 @@ The baseline does not yet justify protected enterprise production use. Phase 1 e
 
 No milestone may be described as production ready solely because its feature list is complete.
 
-What is open and next is kept in the [Outstanding Work Register](QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-18.md) §2. The dated checkpoints below record findings and decisions, newest first.
+What is open and next is kept in the [Outstanding Work Register](QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md) §2. The dated checkpoints below record findings and decisions, newest first.
 
 ### Documentation review findings — 2026-10-02
 
@@ -214,12 +214,12 @@ Raft mutual TLS: the controller becomes healthy, a certificate-authenticated rea
 succeeds, and a request without a client certificate is rejected during the TLS handshake. The
 image health check now follows the configured HTTP scheme and uses `/health/live`. This closes
 the repository configuration defect; it is not production PKI or deployment accreditation. Tracked as `CFG-01` in the
-[Outstanding Work Register](QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-18.md) Section I.
+[Outstanding Work Register](QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md) Section I.
 
 **Documentation review delivery items — 2026-09-26:** The
 [2026-09-24 documentation review](../reviews/QUORUS_DOCUMENTATION_REVIEW_2026-09-24.md) found
 code and configuration defects alongside its documentation findings. The documentation work is
-[register Section H](QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-18.md#11-section-h--documentation-remediation), and its decisions are in the register's §3 decision log. The delivery work
+[register Section H](QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md#11-section-h--documentation-remediation), and its decisions are in the register's §3 decision log. The delivery work
 is added to this plan and carried in register Section I: revocation-serial normalisation
 (`SEC-01`, code fixed, ADR-0009 outstanding) and node-local revocation scope (`SEC-02`); silent
 direct-URI SFTP host-key bypass (`SEC-03`); unbound Raft peer identity (`SEC-04`); first-match
@@ -1226,7 +1226,7 @@ The enterprise release candidate is approved only when all critical canonical ga
 
 ## 20. Platform Migration Workstreams
 
-**Status:** In progress. Direction accepted on 2026-09-26. `RT-01` to `RT-05` are complete, so of the default-build modules only `quorus-controller` still uses Vert.x. `RT-06` no longer waits for QRaft (`SEQ-03`, 2026-09-28) and starts with `RT-06a`; its prerequisite benchmark baselines B-08 and B-09 were recorded on 2026-09-28 (`ENG-15`). Workstream `CE` has not started. The state of both engines and the work per `CE` item are assessed in the [QRaft integration assessment](../design/QUORUS_QRAFT_INTEGRATION_ASSESSMENT.md) (2026-09-28), with open decisions `CE-Q1` to `CE-Q5`. The assessment's dated update of 2026-10-03 (register DR-F20) records that QRaft has since implemented membership changes and moved to raftlog 1.4.1, so `CE-Q3` and `CE-Q4` are re-read against QRaft's current `main` before `CE` starts. Item status is kept in [register Section J](QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-18.md#13-section-j--platform-migration-workstreams)
+**Status:** In progress. Direction accepted on 2026-09-26. `RT-01` to `RT-05` are complete, so of the default-build modules only `quorus-controller` still uses Vert.x. `RT-06` no longer waits for QRaft (`SEQ-03`, 2026-09-28) and starts with `RT-06a`; its prerequisite benchmark baselines B-08 and B-09 were recorded on 2026-09-28 (`ENG-15`). Workstream `CE` has not started. The state of both engines and the work per `CE` item are assessed in the [QRaft integration assessment](../design/QUORUS_QRAFT_INTEGRATION_ASSESSMENT.md) (2026-09-28), with open decisions `CE-Q1` to `CE-Q5`. The assessment's dated update of 2026-10-03 (register DR-F20) records that QRaft has since implemented membership changes and moved to raftlog 1.4.1, so `CE-Q3` and `CE-Q4` are re-read against QRaft's current `main` before `CE` starts. Item status is kept in [register Section J](QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md#13-section-j--platform-migration-workstreams)
 **Decisions:** [ADR-0011](../architecture-decisions/ADR-0011-CONSENSUS-VIA-QRAFT-GENERIC-ENGINE.md) (consensus through the generic QRaft engine) and [ADR-0012](../architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md) (leave Vert.x for Java 27 structured concurrency)
 
 These two workstreams change the platform beneath the phases rather than adding enterprise capability. Each item is delivered under Section 6.1 and must keep every delivered phase's boundary tests green. Neither workstream may weaken a delivered exit gate. In particular, Phase 1's controller-to-controller mutual TLS, peer rejection and revocation behaviour must pass unchanged through the new engine.
@@ -1302,7 +1302,7 @@ Architecture, security, operations, quality, and product/domain owners participa
 
 ## 22. Gap-to-Phase Traceability
 
-This table assigns each gap to its delivery phases. Current closure status is maintained in [register §14](QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-18.md#14-gap-to-section-traceability), not here.
+This table assigns each gap to its delivery phases. Current closure status is maintained in [register §14](QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md#14-gap-to-section-traceability), not here.
 
 | Gap | Delivery phase |
 |---|---|
@@ -1380,7 +1380,7 @@ The plan is revised when requirements or implementation evidence change. Revisio
 
 | Version | Date | Changes |
 |---|---|---|
-| 1.46 | 2026-10-18 | Links repointed to the register's dated filename, `QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-18.md` (register v1.29, governance rule 7: the register's filename carries the date of its last update) |
+| 1.46 | 2026-10-18 | Links repointed to the register's dated filename, `QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md` (register v1.29, governance rule 7: the register's filename carries the date of its last update) |
 | 1.45 | 2026-10-17 | §4: the 2026-10-02 findings list is one list again, and the commits of 2026-10-03 are cited for the delivered items (`SEC-09`, `SEC-11`, `ENG-17` to `ENG-21`, `ENG-25`, `ENG-27`, `ENG-28`, `DR-Q4`, `DR-Q5`, `DR-Q10`); new delivery item `ENG-30`, the end-to-end run on real containers that `ENG-17`, `ENG-19` and `ENG-27` did not include. §20: the status note and `CE-09` record QRaft's move to raftlog 1.4.1 and membership changes (register DR-F20), to be read against `CE-Q3` and `CE-Q4`. Register v1.28 is cited |
 | 1.44 | 2026-10-03 | §4: findings of the 2026-10-02 documentation review added as delivery items `SEC-09` to `SEC-11` and `ENG-17` to `ENG-25`, with `SEC-09` taken first; the §1 description of the System Design updated after its split (DR-C5); `ENG-01` restated (no assignment scheduler runs); `ENG-13` to `ENG-16`, `OBS-15` and `STATUS-01` brought into the plan. Corrections (register DR-B9): the §20 status line said `RT-06` waits for `CE-07` to `CE-11`, contradicting `SEQ-03`; the `CE-07` acceptance and §20 sequencing steps 2 and 3 described a Vert.x bridge and an order that `SEQ-03` replaced; §3 still listed uncontrolled service connectivity as a blocker after Phase 4; Phase 2 listed the closed `ARCH-06` and `ARCH-17`; §4 now states how `SEQ-01` applies to Phases 1 and 4, which closed before it. §4 now opens with the milestone table, followed by the dated checkpoints, and points to register §2 for what is open. §6 Definition of Done gains the contract-documentation rule (register DR-D5). Scope note on v1.43: its removal of the retained-digest Definition of Done bullet and the Phase 0 release-manifest deliverable was a scope change, not a simplification |
 | 1.43 | 2026-10-02 | §6 Definition of Done, §6.1, the Phase 0 deliverables and §24 simplified: a slice's record is its commit message (`DR-Q6`); checkpoint wording tidied |
