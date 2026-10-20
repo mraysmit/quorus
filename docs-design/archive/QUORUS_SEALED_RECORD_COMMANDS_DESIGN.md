@@ -14,7 +14,7 @@
 > runtime transition validation (phases 7–10) are implemented and covered by
 > `StateTransitionIntegrationTest`. Retained as design rationale. The one open idea — compile-time
 > type-safe state encoding in §15 — is tracked as `DEF-02` in the
-> [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md).
+> [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-20.md).
 
 ---
 

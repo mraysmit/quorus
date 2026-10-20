@@ -329,4 +329,4 @@ Re-verify against the current tree before relying on it.
 | QR-08 | Open | HTTP adapter still buffers the body (`ARCH-09`, task `DR-X05`) |
 | QR-09 | Fixed | `HttpApiServer` listens on the configured host |
 | QR-10 | Fixed | Internal backends removed; only `raftlog` is accepted |
-| QR-11 | Partly fixed | Tracked in [register Section H](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md#11-section-h--documentation-remediation) |
+| QR-11 | Partly fixed | Tracked in [register Section H](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-20.md#11-section-h--documentation-remediation) |

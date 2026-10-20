@@ -6,9 +6,9 @@
 **Date:** 2026-09-26
 **Author:** Mark Ray-Smith — Cityline Ltd
 **License:** Apache 2.0
-**Status:** Archived 2026-09-26 — merged into the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md)
+**Status:** Archived 2026-09-26 — merged into the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-20.md)
 
-> **Archived.** This list was merged into the register, which is the project's single task list: documentation tasks are [Section H](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md#11-section-h--documentation-remediation), code defects are Section I, and decisions are in the §3 decision log. Task IDs are unchanged. Do not update this file; its progress notes are kept as history.
+> **Archived.** This list was merged into the register, which is the project's single task list: documentation tasks are [Section H](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-20.md#11-section-h--documentation-remediation), code defects are Section I, and decisions are in the §3 decision log. Task IDs are unchanged. Do not update this file; its progress notes are kept as history.
 
 ---
 
@@ -20,7 +20,7 @@ tasks with stable IDs. It covers every action in the review's §9 remediation pl
 configuration defect in §6, and the per-document fixes in §3 and §7 that §9 does not name.
 
 **This list is derivative, like the
-[Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md).** Where a task is delivery work
+[Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-20.md).** Where a task is delivery work
 rather than a documentation correction, it goes into the
 [enterprise plan](../task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md) first and is then reflected in the
 register (register §14.3). Tasks marked **→ Register** need that step.

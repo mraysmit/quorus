@@ -262,7 +262,7 @@ Storage-dependent tests use the real adapter on temporary directories. The volat
 | Follower compaction | Followers do not take snapshots (§9.1). A follower's WAL and in-memory log grow until it installs a leader snapshot |
 | Log hard limit | Applies only to leader submits; not to followers or replay; untested |
 
-R1-2 and R1-3 are release blockers in [register §4](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md#4-section-a--r1-durability-acceptance-release-blockers).
+R1-2 and R1-3 are release blockers in [register §4](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-20.md#4-section-a--r1-durability-acceptance-release-blockers).
 
 ## 14. After QRaft
 

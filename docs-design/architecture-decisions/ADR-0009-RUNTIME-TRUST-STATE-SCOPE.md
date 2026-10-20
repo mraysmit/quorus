@@ -7,7 +7,7 @@
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0
 
-**Status:** Accepted. It records decision `DR-Q2`, taken by project authority on 2026-09-25, in the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md#3-decision-log). Register items `SEC-01` and `SEC-02` close with it.
+**Status:** Accepted. It records decision `DR-Q2`, taken by project authority on 2026-09-25, in the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-20.md#3-decision-log). Register items `SEC-01` and `SEC-02` close with it.
 
 **Relates to:** [ADR-0003](ADR-0003-IDENTITY-BOUNDARY.md) (identity boundary), [ADR-0011](ADR-0011-CONSENSUS-VIA-QRAFT-GENERIC-ENGINE.md) (consensus through QRaft, which must keep this model) and the proposed [ADR-0013](ADR-0013-BREAK-GLASS-ELEVATION.md) (break-glass elevation, which relies on it).
 

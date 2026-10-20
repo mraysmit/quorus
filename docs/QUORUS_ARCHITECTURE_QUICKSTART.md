@@ -185,4 +185,4 @@ The repository root `pom.xml` sets:
 - `docs/QUORUS_WORKFLOWS_README.md`
 - `docs/QUORUS_YAML_SYNTAX_GUIDE.md`
 - `docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md` — the delivery plan
-- `docs-design/task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md` — every open task and decision
+- `docs-design/task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-20.md` — every open task and decision

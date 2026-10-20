@@ -11,7 +11,7 @@
 > **Archived 2026-09-07.** Retained for provenance and historical implementation evidence; it is
 > not current implementation guidance. Stages 1–5 are complete and Stage 6 was superseded. The
 > controlling roadmap is the [Quorus Enterprise Implementation Plan](../task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md) and open work is
-> tracked in the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md).
+> tracked in the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-20.md).
 
 > [!IMPORTANT]
 > This is a point-in-time implementation plan. Completion markers do not establish current production conformance. In particular, tenant field checks are not authenticated tenant isolation, and current assignment, security, transfer-operations telemetry, service-connectivity, and agent-lifecycle gaps are governed by [QUORUS_ARCHITECTURE_SPECIFICATION.md](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md) and [QUORUS_REST_API_SPECIFICATION.md](../../docs/QUORUS_REST_API_SPECIFICATION.md).

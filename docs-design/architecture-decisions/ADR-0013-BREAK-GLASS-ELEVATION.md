@@ -7,7 +7,7 @@
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0
 
-**Status:** Proposed on 2026-10-19 for owner review. It designs decision `DR-Q3` in the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md#3-decision-log), which required a short design before delivery. Delivery item `SEC-06` implements it once this ADR is accepted.
+**Status:** Proposed on 2026-10-19 for owner review. It designs decision `DR-Q3` in the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-20.md#3-decision-log), which required a short design before delivery. Delivery item `SEC-06` implements it once this ADR is accepted.
 
 **Relates to:** [ADR-0003](ADR-0003-IDENTITY-BOUNDARY.md), which requires break-glass access to be "time-bound, strongly authenticated and audited". The planned ADR-0009 (runtime trust-state scope) covers revocation, which is the main thing break-glass is for.
 

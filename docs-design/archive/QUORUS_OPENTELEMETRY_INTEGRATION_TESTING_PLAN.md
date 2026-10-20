@@ -11,13 +11,13 @@
 > **Archived 2026-09-07.** Retained for its collector, Prometheus, Tempo and test-scenario detail,
 > which remains technically useful. Its task grid was reconciled against live source immediately
 > before archival (v2.6), but status is now tracked as `OBS-*` items in the
-> [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md). Treat this document as
+> [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-20.md). Treat this document as
 > reference material, not as a live backlog.
 
 > [!IMPORTANT]
 > This plan covers telemetry infrastructure and instrumentation work. Quorus operational observability is transfer-process centered: per-transfer attempts, continuous progress and freshness, deadlines, risk, stalls, integrity, publication, alerts, and operator timelines are the controlling production outcomes. See [QUORUS_ARCHITECTURE_SPECIFICATION.md](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md) and [QUORUS_REST_API_SPECIFICATION.md](../../docs/QUORUS_REST_API_SPECIFICATION.md).
 >
-> **Narrative sections are point-in-time analysis; the [Implementation Task Grid](#implementation-task-grid) is authoritative for status.** The grid was reconciled against live source on 2026-09-07. Earlier prose in this document — particularly the module gap analyses and the "Future Migration Phases" framing — still reflects its original audit dates and may describe delivered work as pending. Open telemetry items also appear as `OBS-*` entries in the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md), which is the single consolidated view of outstanding work across all planning documents.
+> **Narrative sections are point-in-time analysis; the [Implementation Task Grid](#implementation-task-grid) is authoritative for status.** The grid was reconciled against live source on 2026-09-07. Earlier prose in this document — particularly the module gap analyses and the "Future Migration Phases" framing — still reflects its original audit dates and may describe delivered work as pending. Open telemetry items also appear as `OBS-*` entries in the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-20.md), which is the single consolidated view of outstanding work across all planning documents.
 
 ## Table of Contents
 
@@ -325,7 +325,7 @@ curl http://localhost:8081/api/v1/status
 > **Not a production-readiness claim.** A working telemetry stack does not make Quorus production
 > ready. The R1 durability acceptance gates (`R1-1`, `R1-2`, `R1-3`) remain open and block the
 > enterprise release claim, and Phases 5–12 are unstarted. See the
-> [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md).
+> [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-20.md).
 
 ---
 
@@ -2809,7 +2809,7 @@ The following phases represent planned work for extending OpenTelemetry instrume
 Calendar targets were removed on 2026-09-07: the enterprise plan deliberately assigns no dates
 until team size, platform, identity provider, secrets provider, evidence platform and pilot scope
 are agreed. Sequencing is governed by the enterprise phases, and open items are tracked as `OBS-*`
-in the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md).
+in the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-20.md).
 
 ---
 
@@ -3552,7 +3552,7 @@ Track progress on all OpenTelemetry migration, testing, and audit work.
 > Calendar targets have been removed. The enterprise plan deliberately assigns no dates until team
 > size, platform, identity provider, secrets provider, evidence platform and pilot scope are agreed.
 > The **Delivery reference** column gives the owning phase or the item ID in the
-> [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md) instead.
+> [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-20.md) instead.
 >
 > This grid covers telemetry *infrastructure and instrumentation*. It is not a substitute for
 > enterprise Phase 3, which owns transfer-process operational outcomes — progress, deadlines,
@@ -3701,7 +3701,7 @@ superseded by Phase 11, and eleven rows were reconciled to their actual delivere
 Priorities are relative within this telemetry backlog. They do not compete with enterprise phase
 work: no item in this grid is a release blocker, and none closes a canonical `ARCH` or `API` gap.
 The release blockers are `R1-1`, `R1-2` and `R1-3` in the
-[Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md).
+[Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-20.md).
 
 ### Next Actions
 
@@ -3731,7 +3731,7 @@ In priority order, with register IDs:
 - Corrected the Logging-OTel bridge row to complete, matching the v2.4 prose that the grid contradicted
 - Corrected `requestId` ↔ `traceId` to partial rather than pending
 - Recorded `TransferMetrics.java` as orphaned dead code awaiting deletion, with a warning that `NetworkTopologyService.getTransferMetrics()` is an unrelated name collision
-- Replaced all calendar targets with a Delivery reference column citing the owning phase or an `OBS-*` item ID in the new [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md)
+- Replaced all calendar targets with a Delivery reference column citing the owning phase or an `OBS-*` item ID in the new [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-20.md)
 - Superseded the post-launch Admin UI decision: enterprise Phase 11 makes operator and administration interfaces a required M4 deliverable
 - Restated the scope boundary: this grid is telemetry infrastructure and instrumentation, and does not advance the enterprise Phase 3 exit gate
 - Summary progress restated as 37 of 55 complete; the change from the previously reported 38% is correction of stale rows, not new delivery

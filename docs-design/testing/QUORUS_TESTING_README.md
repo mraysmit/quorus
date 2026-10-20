@@ -52,7 +52,7 @@ There is no `flaky` tag. `quorus-core` and `quorus-controller` exclude groups, b
 |---|---|
 | `*Test` | Run by Surefire in the default build, unless tagged as above |
 | `*IntegrationTest` | Also run by default. Some need Docker (section 4); most do not (for example the controller's HTTP integration tests start in-process servers) |
-| `*IT` | **Not used.** Surefire's default includes do not match `*IT` and no module configures Failsafe, so such a class would compile and never run. `TestNamingConventionTest` (in `quorus-core`) fails the build if any class that declares a test has a name Surefire does not select. Keep a heavy test out of the default build with a tag, not with its name (decision DR-Q4 in the [register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-19.md)) |
+| `*IT` | **Not used.** Surefire's default includes do not match `*IT` and no module configures Failsafe, so such a class would compile and never run. `TestNamingConventionTest` (in `quorus-core`) fails the build if any class that declares a test has a name Surefire does not select. Keep a heavy test out of the default build with a tag, not with its name (decision DR-Q4 in the [register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-10-20.md)) |
 
 ---
 
