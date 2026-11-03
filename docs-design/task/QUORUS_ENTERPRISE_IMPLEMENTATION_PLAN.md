@@ -2,8 +2,8 @@
 
 # Quorus Enterprise Implementation Plan
 
-**Version:** 1.46  
-**Date:** 2026-10-18  
+**Version:** 1.47  
+**Date:** 2026-11-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Active — remediation checkpoint open; R1-1 container-recreation acceptance closed 2026-09-07 while R1-2 and R1-3 remain open; Phase 0 functionally complete with M0 durability acceptance reopened until R1-2 and R1-3 close; Phase 1 complete; Phase 4 complete (the acceptance reopened on 2026-09-04 was restored by R2–R6 on 2026-09-05), with hardening follow-up `SEC-07` open; Phases 2 and 3 in progress; Phases 5–12 not started; platform migration (Section 20) in progress. CI has never passed; its repair is deferred (`ENG-07`, `SEQ-01`, Section 4)  
@@ -221,7 +221,7 @@ the repository configuration defect; it is not production PKI or deployment accr
 code and configuration defects alongside its documentation findings. The documentation work is
 [register Section H](QUORUS_OUTSTANDING_WORK_REGISTER_2026-11-03.md#11-section-h--documentation-remediation), and its decisions are in the register's §3 decision log. The delivery work
 is added to this plan and carried in register Section I: revocation-serial normalisation
-(`SEC-01`, code fixed, ADR-0009 outstanding) and node-local revocation scope (`SEC-02`); silent
+(`SEC-01`, closed with ADR-0009 on 2026-10-19) and node-local revocation scope (`SEC-02`); silent
 direct-URI SFTP host-key bypass (`SEC-03`); unbound Raft peer identity (`SEC-04`); first-match
 role evaluation (`SEC-05`); direct-mTLS elevation (`SEC-06`); four configuration residuals
 (`CFG-02` to `CFG-05`); and engineering items `ENG-01` to `ENG-06`, of which `ENG-01` (the
@@ -229,7 +229,9 @@ uninstantiated assignment timeout monitor) belongs with Phase 2 lease automation
 delivered under Section 6.1; none is assigned to a phase yet. Three existing plan obligations
 also received register IDs: the durable agent-report outbox (`P2-13`), the persistent-environment
 storage inventory (`R1-4`), and disposition of the two Raft regression cases without a preserved
-red stage (`PROC-01`).
+red stage (`PROC-01`). A fifth configuration residual, `CFG-06` (a boolean value other than
+`true` reads as `false` without a warning, so `quorus.raft.storage.fsync=yes` disables durability),
+was found on 2026-11-03 while writing ADR-0007 and is carried in Section I with the others.
 
 ### Remediation checkpoint — 2026-09-04
 
@@ -1380,6 +1382,7 @@ The plan is revised when requirements or implementation evidence change. Revisio
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.47 | 2026-11-03 | §4: new configuration residual `CFG-06` (boolean values), found while writing ADR-0007; the `SEC-01` status corrected (closed with ADR-0009 on 2026-10-19) |
 | 1.46 | 2026-10-18 | Links repointed to the register's dated filename, `QUORUS_OUTSTANDING_WORK_REGISTER_2026-11-03.md` (register v1.29, governance rule 7: the register's filename carries the date of its last update) |
 | 1.45 | 2026-10-17 | §4: the 2026-10-02 findings list is one list again, and the commits of 2026-10-03 are cited for the delivered items (`SEC-09`, `SEC-11`, `ENG-17` to `ENG-21`, `ENG-25`, `ENG-27`, `ENG-28`, `DR-Q4`, `DR-Q5`, `DR-Q10`); new delivery item `ENG-30`, the end-to-end run on real containers that `ENG-17`, `ENG-19` and `ENG-27` did not include. §20: the status note and `CE-09` record QRaft's move to raftlog 1.4.1 and membership changes (register DR-F20), to be read against `CE-Q3` and `CE-Q4`. Register v1.28 is cited |
 | 1.44 | 2026-10-03 | §4: findings of the 2026-10-02 documentation review added as delivery items `SEC-09` to `SEC-11` and `ENG-17` to `ENG-25`, with `SEC-09` taken first; the §1 description of the System Design updated after its split (DR-C5); `ENG-01` restated (no assignment scheduler runs); `ENG-13` to `ENG-16`, `OBS-15` and `STATUS-01` brought into the plan. Corrections (register DR-B9): the §20 status line said `RT-06` waits for `CE-07` to `CE-11`, contradicting `SEQ-03`; the `CE-07` acceptance and §20 sequencing steps 2 and 3 described a Vert.x bridge and an order that `SEQ-03` replaced; §3 still listed uncontrolled service connectivity as a blocker after Phase 4; Phase 2 listed the closed `ARCH-06` and `ARCH-17`; §4 now states how `SEQ-01` applies to Phases 1 and 4, which closed before it. §4 now opens with the milestone table, followed by the dated checkpoints, and points to register §2 for what is open. §6 Definition of Done gains the contract-documentation rule (register DR-D5). Scope note on v1.43: its removal of the retained-digest Definition of Done bullet and the Phase 0 release-manifest deliverable was a scope change, not a simplification |

@@ -2,14 +2,14 @@
 
 # ADR-0009: Runtime Trust State Is Node-Local
 
-**Version:** 1.0  
-**Date:** 2026-10-19  
+**Version:** 1.1  
+**Date:** 2026-11-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0
 
 **Status:** Accepted. It records decision `DR-Q2`, taken by project authority on 2026-09-25, in the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-11-03.md#3-decision-log). Register items `SEC-01` and `SEC-02` close with it.
 
-**Relates to:** [ADR-0003](ADR-0003-IDENTITY-BOUNDARY.md) (identity boundary), [ADR-0011](ADR-0011-CONSENSUS-VIA-QRAFT-GENERIC-ENGINE.md) (consensus through QRaft, which must keep this model) and the proposed [ADR-0013](ADR-0013-BREAK-GLASS-ELEVATION.md) (break-glass elevation, which relies on it).
+**Relates to:** [ADR-0003](ADR-0003-IDENTITY-BOUNDARY.md) (identity boundary), [ADR-0011](ADR-0011-CONSENSUS-VIA-QRAFT-GENERIC-ENGINE.md) (consensus through QRaft, which must keep this model) and [ADR-0013](ADR-0013-BREAK-GLASS-ELEVATION.md) (break-glass elevation, which relies on it).
 
 ## Context
 
@@ -59,4 +59,5 @@ Before `DR-Q2`, the documents did not say whether a run-time revocation reached 
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.1 | 2026-11-03 | ADR-0013 is no longer described as proposed: it was accepted on 2026-11-03 |
 | 1.0 | 2026-10-19 | Records decision `DR-Q2` (2026-09-25) and the delivered `SEC-01`, `SEC-09` and `SEC-11` behaviour |

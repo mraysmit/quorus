@@ -2,12 +2,12 @@
 
 # ADR-0010: Workflow YAML Semantics
 
-**Version:** 1.0  
-**Date:** 2026-10-20  
+**Version:** 1.1  
+**Date:** 2026-11-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0
 
-**Status:** Accepted for decisions `DR-Q1` and `ENG-Q1`, taken by project authority on 2026-10-03, in the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-11-03.md#3-decision-log). Items 6 to 9 were chosen while delivering `ENG-14` on 2026-10-18; they are marked **to confirm** and await the owner's confirmation.
+**Status:** Accepted for decisions `DR-Q1` and `ENG-Q1`, taken by project authority on 2026-10-03, in the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-11-03.md#3-decision-log). Items 6 to 9 were chosen while delivering `ENG-14` on 2026-10-18 and confirmed by the owner on 2026-11-03.
 
 **Relates to:** the [YAML Syntax Guide](../../docs/QUORUS_YAML_SYNTAX_GUIDE.md), which is the user reference for these rules. This ADR records why the rules are what they are.
 
@@ -44,13 +44,13 @@ The execution settings were fixed by `RT-04` and `ENG-12` (timeout, parallelism)
 
 5. **Variable references are allowed only inside a `file_exists` path**, so that every name a condition uses is known at validation.
 
-6. **To confirm. A condition may name only what has finished**: a group this group depends on, directly or transitively, or a transfer of such a group. A transfer of the same group runs in parallel, so it is refused rather than given hidden ordering. A name must be exactly one group or one transfer. The stricter rule was chosen because relaxing it later breaks no workflow, while tightening it would.
+6. **A condition may name only what has finished**: a group this group depends on, directly or transitively, or a transfer of such a group. A transfer of the same group runs in parallel, so it is refused rather than given hidden ordering. A name must be exactly one group or one transfer. The stricter rule was chosen because relaxing it later breaks no workflow, while tightening it would.
 
-7. **To confirm. Outcomes:** `success(x)` is true when `x` ran and succeeded, and `failure(x)` when it ran and failed. Both are false when `x` was skipped. `failure(x)` on a group without `continueOnError` is a validation warning, because the workflow stops when that group fails.
+7. **Outcomes:** `success(x)` is true when `x` ran and succeeded, and `failure(x)` when it ran and failed. Both are false when `x` was skipped. `failure(x)` on a group without `continueOnError` is a validation warning, because the workflow stops when that group fails.
 
-8. **To confirm. A false condition skips.** A skipped group has status `SKIPPED` and runs no transfer. A skipped transfer has no result and is listed in its group's skipped transfers. A skip is not a failure: the workflow can complete, and a skipped group's dependents still run, subject to their own conditions.
+8. **A false condition skips.** A skipped group has status `SKIPPED` and runs no transfer. A skipped transfer has no result and is listed in its group's skipped transfers. A skip is not a failure: the workflow can complete, and a skipped group's dependents still run, subject to their own conditions.
 
-9. **To confirm. Evaluation:** a group's condition is evaluated when its dependencies have finished, and a transfer's when its group starts. `file_exists` checks the filesystem of the machine running the workflow engine, after variable resolution. A condition that cannot be evaluated at run time fails its group or transfer without starting it. Normal and virtual runs evaluate conditions; a dry run does not.
+9. **Evaluation:** a group's condition is evaluated when its dependencies have finished, and a transfer's when its group starts. `file_exists` checks the filesystem of the machine running the workflow engine, after variable resolution. A condition that cannot be evaluated at run time fails its group or transfer without starting it. Normal and virtual runs evaluate conditions; a dry run does not.
 
 ### Execution settings (delivered by `RT-04`, `ENG-12` and `ENG-13`)
 
@@ -76,4 +76,5 @@ The execution settings were fixed by `RT-04` and `ENG-12` (timeout, parallelism)
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.1 | 2026-11-03 | Items 6 to 9 confirmed by the owner as delivered: names limited to upstream groups and their transfers; skipped is neither success nor failure, with the `continueOnError` warning kept; a false condition skips without cascading; engine-local `file_exists`, fail-closed evaluation, and no evaluation in a dry run |
 | 1.0 | 2026-10-20 | Records decisions `DR-Q1` and `ENG-Q1` as delivered by `ENG-26` and `ENG-14`, and the execution settings delivered by `RT-04`, `ENG-12` and `ENG-13`. Items 6 to 9 await confirmation |

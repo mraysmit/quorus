@@ -182,7 +182,8 @@ public final class AppConfig {
 
     /**
      * Gets the Raft storage backend type.
-     * Supported values: "raftlog" (default, the raftlog-core library) and "memory" (testing only).
+     * The only supported value is "raftlog" (the default, the raftlog-core library); {@link #validate()}
+     * rejects any other (ADR-0006).
      */
     public String getRaftStorageType() {
         return getString("quorus.raft.storage.type", "raftlog");

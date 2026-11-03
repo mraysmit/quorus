@@ -2,14 +2,14 @@
 
 # ADR-0011: Consensus Through the Generic QRaft Engine
 
-**Version:** 1.1  
-**Date:** 2026-09-28  
+**Version:** 1.2  
+**Date:** 2026-11-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0
 
 **Status:** Accepted as direction by project authority on 2026-09-26. The interface details below are proposed and are settled by workstream `CE` in the [enterprise implementation plan](../task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md#20-platform-migration-workstreams).
 
-**Supersedes:** the in-repository Raft engine (`RaftNode`, gRPC Raft transport, `RaftLogStorageAdapter`, and the snapshot sidecar) as the long-term consensus implementation. The planned ADR-0006 (raftlog-core WAL and snapshot sidecar) is narrowed to recording the current state until this ADR is implemented.
+**Supersedes:** the in-repository Raft engine (`RaftNode`, gRPC Raft transport, `RaftLogStorageAdapter`, and the snapshot sidecar) as the long-term consensus implementation. [ADR-0006](ADR-0006-RAFT-STORAGE-RAFTLOG-AND-SNAPSHOT-SIDECAR.md) (raftlog-core WAL and snapshot sidecar) records the current state until this ADR is implemented.
 
 ## Context
 
@@ -73,5 +73,6 @@ The controller calls a narrow part of Quorus's own engine: `submitCommand` (30 c
 
 | Version | Date | Change |
 |---|---|---|
+| 1.2 | 2026-11-03 | The Supersedes line links ADR-0006, now written |
 | 1.1 | 2026-09-28 | Context links the integration assessment of 2026-09-28 and its open questions `CE-Q1` to `CE-Q5` |
 | 1.0 | 2026-09-26 | Accepted as direction |

@@ -2,8 +2,8 @@
 
 # Quorus Design and Engineering Documents
 
-**Version:** 1.2  
-**Date:** 2026-10-03  
+**Version:** 1.3  
+**Date:** 2026-11-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Documentation scope and precedence  
@@ -33,7 +33,7 @@ The record of each implementation slice is its commit message (decision `DR-Q6`)
 | `design/` | Non-normative design material | May combine implemented, superseded, and target-state concepts; canonical specifications take precedence |
 | `task/` | Live planning: the delivery roadmap and the outstanding-work register, which is the single task list | Completion markers describe the plan at its recorded date, not current production conformance |
 | `reviews/` | Point-in-time codebase and documentation reviews | Findings describe the reviewed revision; follow-up status lives in the register |
-| `architecture-decisions/` | Architecture decision records | A decision stands until a later ADR supersedes it |
+| `architecture-decisions/` | Architecture decision records, listed in the [ADR index](architecture-decisions/README.md) | A decision stands until a later ADR supersedes it |
 | `reference/` | Engineering policies and reference material (versioning, reproducible builds, commit rewrite map) | Current unless the document states otherwise |
 | `testing/` | Engineering test guidance and investigations | Demonstrates specific test procedures; does not establish security, availability, or production readiness by itself |
 | `performance/` | The benchmark specification, its results log, and point-in-time optimization records | Claims apply only to the measured component, workload, hardware, and date |

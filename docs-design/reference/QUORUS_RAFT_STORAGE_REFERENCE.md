@@ -2,8 +2,8 @@
 
 # Quorus Raft Storage Reference
 
-**Version:** 1.1  
-**Date:** 2026-10-03  
+**Version:** 1.2  
+**Date:** 2026-11-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Current for the in-repository Raft engine on `raftlog-core` 1.2.0. Under [ADR-0011](../architecture-decisions/ADR-0011-CONSENSUS-VIA-QRAFT-GENERIC-ENGINE.md) this engine and its direct `raftlog-core` use are replaced by the QRaft engine (register item `CE-10`); this reference then becomes history.
@@ -31,7 +31,7 @@
 
 This reference describes how the Quorus controller stores Raft state today: the external write-ahead log (WAL), the Quorus snapshot sidecar, their configuration, recovery and the rules for operating a data directory. Every statement was checked against the source tree on 2026-10-03. Paths are relative to the repository root unless stated. Statements about `raftlog-core` internals were checked against `raftlog-core-1.2.0-sources.jar`, the sources artifact published with the binary.
 
-The normative persistence requirements are in [Architecture Specification §5.5](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#55-persistence-requirements). Where this reference and the specification disagree, the specification wins and this reference is wrong.
+The normative persistence requirements are in [Architecture Specification §5.5](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#55-persistence-requirements), and the reasons for the design are in [ADR-0006](../architecture-decisions/ADR-0006-RAFT-STORAGE-RAFTLOG-AND-SNAPSHOT-SIDECAR.md). Where this reference and the specification disagree, the specification wins and this reference is wrong.
 
 The earlier design document, which proposed an in-repository file WAL that was never built, is archived as [QUORUS_RAFT_WAL_DESIGN.md](../archive/QUORUS_RAFT_WAL_DESIGN.md).
 
@@ -274,5 +274,6 @@ R1-2 and R1-3 are release blockers in [register §4](../task/QUORUS_OUTSTANDING_
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.2 | 2026-11-03 | §1 links ADR-0006, which records the design's reasons |
 | 1.1 | 2026-10-03 | Register `ENG-21` fixed: §8 states that peer RPCs wait for the first recovery, and the "RPCs during recovery" gap is removed from §13; the §12 test map gains the recovery-vote test. `RaftNode.java` line citations updated for the change |
 | 1.0 | 2026-10-03 | Extracted from the Raft WAL design (now archived) under register item DR-C6, and verified against the source tree and the `raftlog-core` 1.2.0 sources. Carries forward the Status block, §14, the §16.1 serialisation rule, the snapshot checkpoint and operator text of §19, Appendix A and Appendix F (F.5 in §5) |
