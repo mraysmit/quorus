@@ -23,10 +23,12 @@ import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.security.AuthenticationHandler;
 import dev.mars.quorus.controller.security.AuthorizationHandler;
 import dev.mars.quorus.controller.security.AuthorizationPolicyEngine;
+import dev.mars.quorus.controller.security.BreakGlassConfig;
 import dev.mars.quorus.controller.security.SecurityConfig;
 import dev.mars.quorus.controller.security.CertificateTrustState;
 import dev.mars.quorus.controller.security.SecurityProfile;
 import dev.mars.quorus.controller.security.audit.AuditCompletionHandler;
+import dev.mars.quorus.controller.security.audit.AuditEvent;
 import dev.mars.quorus.controller.security.audit.AuditSink;
 import dev.mars.quorus.controller.security.audit.HashChainedAuditLog;
 import dev.mars.quorus.controller.state.QuorusStateStore;
@@ -43,6 +45,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Objects;
 
 /**
@@ -267,13 +270,32 @@ public class HttpApiServer {
         httpServer = vertx.createHttpServer(serverOptions)
                 .requestHandler(router);
 
-        return httpServer.listen(port, host)
+        return recordBreakGlassConfiguration()
+                .compose(ignored -> httpServer.listen(port, host))
                 .onSuccess(server -> logger.info("HTTP API Server listening on {}:{}", host, server.actualPort()))
                 .onFailure(err -> {
                     logger.error("Failed to start HTTP API Server: {}", err.getMessage());
                     logger.debug("Stack trace for HTTP API Server start failure", err);
                 })
                 .mapEmpty();
+    }
+
+    /**
+     * ADR-0013 item 5: when break-glass bindings are configured, say so at startup and record the bound
+     * subjects and pinned issuers. The record must be durable before the server listens.
+     */
+    private Future<Void> recordBreakGlassConfiguration() {
+        BreakGlassConfig breakGlass = securityConfig.breakGlass();
+        if (!securityConfig.enabled() || !breakGlass.enabled()) return Future.succeededFuture();
+        String subjects = String.join("; ", new java.util.TreeSet<>(breakGlass.bindings().keySet()));
+        String issuers = String.join(",", new java.util.TreeSet<>(breakGlass.issuerSha256()));
+        logger.warn("Break-glass elevation is configured: subjects=[{}], pinnedIssuerSha256=[{}], maxCertificateLifetime={}",
+                subjects, issuers, breakGlass.maxCertificateLifetime());
+        AuditEvent event = new AuditEvent(Instant.now(), "SECURITY_CONFIGURATION", "SUCCESS",
+                "Q-SECURITY-BREAK-GLASS-CONFIGURED", null, null, null, null, null, null, null, null,
+                java.util.Map.of("breakGlassSubjects", subjects, "breakGlassIssuerSha256", issuers,
+                        "maxCertificateLifetime", breakGlass.maxCertificateLifetime().toString()));
+        return Future.fromCompletionStage(auditSink.appendAsync(event));
     }
 
     public Future<Void> stop() {

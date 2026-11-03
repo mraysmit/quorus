@@ -10,6 +10,9 @@ import dev.mars.quorus.controller.http.QuorusApiException;
 import dev.mars.quorus.controller.security.audit.AuditContinuation;
 import dev.mars.quorus.controller.security.audit.AuditEvent;
 import dev.mars.quorus.controller.security.audit.AuditSink;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.metrics.LongCounter;
+import io.opentelemetry.api.metrics.Meter;
 import io.vertx.core.Handler;
 import io.vertx.ext.web.RoutingContext;
 import org.slf4j.Logger;
@@ -23,11 +26,12 @@ import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
-/** Authenticates a trusted gateway assertion or a directly bound mTLS identity. */
+/** Authenticates a break-glass certificate, a trusted gateway assertion or a directly bound mTLS identity. */
 public final class AuthenticationHandler implements Handler<RoutingContext> {
     public static final String PRINCIPAL = "X-Quorus-Principal";
     public static final String IDENTITY_TYPE = "X-Quorus-Identity-Type";
@@ -43,6 +47,9 @@ public final class AuthenticationHandler implements Handler<RoutingContext> {
     private final SecurityConfig config;
     private final AuditSink auditSink;
     private final CertificateTrustState trustState;
+    private final BreakGlassAuthenticator breakGlass;
+    private final LongCounter breakGlassRequests;
+    private final LongCounter breakGlassRefusals;
 
     public AuthenticationHandler(SecurityConfig config, AuditSink auditSink) {
         this(config, auditSink, CertificateTrustState.from(config));
@@ -52,6 +59,12 @@ public final class AuthenticationHandler implements Handler<RoutingContext> {
         this.config = config;
         this.auditSink = auditSink;
         this.trustState = trustState;
+        this.breakGlass = BreakGlassAuthenticator.from(config);
+        Meter meter = GlobalOpenTelemetry.getMeter("quorus-controller");
+        this.breakGlassRequests = meter.counterBuilder("quorus.security.break_glass.requests")
+                .setDescription("Requests authenticated with a break-glass certificate (ADR-0013)").build();
+        this.breakGlassRefusals = meter.counterBuilder("quorus.security.break_glass.refusals")
+                .setDescription("Break-glass certificates refused (ADR-0013)").build();
     }
 
     @Override
@@ -78,8 +91,15 @@ public final class AuthenticationHandler implements Handler<RoutingContext> {
                 return;
             }
             String subject = certificate.getSubjectX500Principal().getName();
+            BreakGlassAuthenticator.Outcome breakGlassOutcome = breakGlass.evaluate(certificate);
+            if (breakGlassOutcome.refused()) {
+                refuseBreakGlass(context, subject, certificateEvaluation.certificateSerial(), breakGlassOutcome);
+                return;
+            }
             SecurityIdentity identity;
-            if (config.trustedGatewaySubjects().contains(subject)) {
+            if (breakGlassOutcome.accepted()) {
+                identity = breakGlassOutcome.identity();
+            } else if (config.trustedGatewaySubjects().contains(subject)) {
                 identity = gatewayIdentity(context, subject);
             } else {
                 identity = config.mtlsIdentities().get(subject);
@@ -93,7 +113,19 @@ public final class AuthenticationHandler implements Handler<RoutingContext> {
                 return;
             }
             SecurityContext.setIdentity(context, identity);
-            CompletableFuture<Void> durable = audit(context, identity, "AUTHENTICATION", "ALLOW", "Q-AUTHN-VERIFIED");
+            CompletableFuture<Void> durable;
+            if (breakGlassOutcome.accepted()) {
+                breakGlassRequests.add(1);
+                logger.warn("Break-glass authentication: principal={}, subject={}, serial={}, notAfter={}, method={}, path={}",
+                        identity.principalId(), subject, certificateEvaluation.certificateSerial(), identity.expiresAt(),
+                        context.request().method(), context.request().path());
+                durable = audit(context, identity, subject, "BREAK_GLASS_AUTHENTICATION", "ALLOW", "Q-AUTHN-VERIFIED",
+                        Map.of("certificateSerial", certificateEvaluation.certificateSerial(),
+                                "issuerSha256", breakGlassOutcome.issuerSha256(),
+                                "certificateNotAfter", identity.expiresAt().toString()));
+            } else {
+                durable = audit(context, identity, "AUTHENTICATION", "ALLOW", "Q-AUTHN-VERIFIED");
+            }
             if (certificateEvaluation.expiryAlertState() == CertificateTrustState.ExpiryAlertState.WARNING) {
                 AuditEvent warning = new AuditEvent(Instant.now(), "CERTIFICATE_EXPIRY_WARNING", "WARNING",
                         "Q-CERT-EXPIRY-WARNING", identity.principalId(), identity.type().name(), identity.tenantId(),
@@ -138,6 +170,22 @@ public final class AuthenticationHandler implements Handler<RoutingContext> {
                 Instant.now(), expiresAt, elevation == null || elevation.isBlank() ? null : Instant.parse(elevation));
     }
 
+    /** ADR-0013 item 5: a refused break-glass attempt may signal a compromise, so it has its own code. */
+    private void refuseBreakGlass(RoutingContext context, String subject, String serial,
+                                  BreakGlassAuthenticator.Outcome outcome) {
+        breakGlassRefusals.add(1);
+        logger.warn("Break-glass certificate refused: reason={}, subject={}, serial={}, method={}, path={}",
+                outcome.refusal(), subject, serial, context.request().method(), context.request().path());
+        Map<String, String> attributes = new java.util.LinkedHashMap<>();
+        attributes.put("reason", outcome.refusal());
+        attributes.put("certificateSerial", serial);
+        if (outcome.issuerSha256() != null) attributes.put("issuerSha256", outcome.issuerSha256());
+        CompletableFuture<Void> durable = audit(context, null, subject, "AUTHENTICATION", "DENY",
+                "Q-AUTHN-BREAK-GLASS-REFUSED", attributes);
+        AuditContinuation.afterDurable(context, durable, () -> context.fail(new QuorusApiException(
+                ErrorCode.UNAUTHORIZED, "Client certificate is not an accepted break-glass certificate")));
+    }
+
     private void deny(RoutingContext context, String code, String reason) {
         CompletableFuture<Void> durable = audit(context, null, "AUTHENTICATION", "DENY", code);
         logger.warn("Authentication denied: code={}, method={}, path={}", code,
@@ -148,11 +196,17 @@ public final class AuthenticationHandler implements Handler<RoutingContext> {
 
     private CompletableFuture<Void> audit(RoutingContext context, SecurityIdentity identity, String eventType,
                                           String outcome, String code) {
+        return audit(context, identity, identity == null ? null : identity.certificateSubject(), eventType, outcome,
+                code, null);
+    }
+
+    private CompletableFuture<Void> audit(RoutingContext context, SecurityIdentity identity, String subject,
+                                          String eventType, String outcome, String code, Map<String, String> attributes) {
         return auditSink.appendAsync(new AuditEvent(Instant.now(), eventType, outcome, code,
                 identity == null ? null : identity.principalId(), identity == null ? null : identity.type().name(),
                 identity == null ? null : identity.tenantId(), identity == null ? null : identity.environment(),
-                identity == null ? null : identity.certificateSubject(), context.request().method().name(),
-                context.request().path(), CorrelationIdHandler.getRequestId(context), null));
+                subject, context.request().method().name(),
+                context.request().path(), CorrelationIdHandler.getRequestId(context), attributes));
     }
 
     private static String required(RoutingContext context, String header) {

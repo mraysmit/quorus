@@ -2,8 +2,8 @@
 
 # Quorus Service Connection Operations Runbook
 
-**Version:** 1.1  
-**Date:** 2026-10-03  
+**Version:** 1.2  
+**Date:** 2026-11-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Current Phase 4 operations runbook  
@@ -44,7 +44,7 @@ Never bypass a failed stage by widening a CIDR, path, hostname, port, agent pool
 
 ### 3.1 Authorization for changes
 
-Creating, updating or deleting a service connection or secret reference requires the matching `service-connections:*` or `secret-references:*` write scope, which the `SECURITY` and `ADMINISTRATOR` roles grant, and an active time-bounded elevation. Only gateway-asserted identities can hold elevation: the trusted gateway sends `X-Quorus-Elevation-Expires-At` with the other `X-Quorus-*` assertion headers. Configured certificate bindings cannot elevate (register decision `DR-Q3`). Reads need only the read scope.
+Creating, updating or deleting a service connection or secret reference requires the matching `service-connections:*` or `secret-references:*` write scope, which the `SECURITY` and `ADMINISTRATOR` roles grant, and an active time-bounded elevation. These writes need a gateway-asserted identity: the trusted gateway sends `X-Quorus-Elevation-Expires-At` with the other `X-Quorus-*` assertion headers. Ordinary certificate bindings cannot elevate (register decision `DR-Q3`), and a break-glass certificate, which can, is limited to revocation and reads ([ADR-0013](../docs-design/architecture-decisions/ADR-0013-BREAK-GLASS-ELEVATION.md)). Reads need only the read scope.
 
 ### 3.2 Behaviour to expect
 

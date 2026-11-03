@@ -2,8 +2,8 @@
 
 # Quorus Certificate and Trust Incident Runbook
 
-**Version:** 1.3  
-**Date:** 2026-10-03  
+**Version:** 1.4  
+**Date:** 2026-11-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Phase 1 operational runbook  
@@ -19,7 +19,7 @@ Treat a gateway or controller private-key compromise as critical because it can 
 
 1. Declare the incident owner, affected environment, business services, tenants, and transfer deadlines.
 2. Preserve controller, gateway, agent, PKI, deployment, network, and audit evidence. Do not copy private keys into tickets or chat.
-3. Stop new privileged changes through the affected identity. Use a separately authenticated break-glass path only if it is pre-approved, time-bounded, and externally audited.
+3. Stop new privileged changes through the affected identity. Use a separately authenticated break-glass path only if it is pre-approved, time-bounded, and externally audited. Quorus provides one for revocation: a short-lived break-glass certificate ([§4.6](#46-break-glass-revocation)).
 4. For an agent identity, drain or stop the affected agent before revocation when safe; never reassign a transfer blindly if publication outcome is uncertain.
 5. For a controller identity, preserve Raft quorum. Never stop or replace a majority simultaneously.
 6. For a gateway identity, remove the exact subject from `quorus.security.trusted-gateway-subjects` and route traffic through a known-good gateway identity.
@@ -99,9 +99,23 @@ The request replaces the controller's whole runtime revocation set. Send the com
 ```
 
 - `revokedCertificateSerials` is required. A request without it, or with a value that is not an array, is rejected with `400` and changes nothing. An empty array clears every runtime and configured revocation on that controller.
-- The caller needs the `security:trust:write` scope with active elevation. Only gateway-asserted identities can hold elevation: the trusted gateway sends `X-Quorus-Elevation-Expires-At` with the other `X-Quorus-*` assertion headers.
+- The caller needs the `security:trust:write` scope with active elevation. Ordinary certificate bindings never hold elevation. A gateway-asserted identity can, when the trusted gateway sends `X-Quorus-Elevation-Expires-At` with the other `X-Quorus-*` assertion headers, and so can a break-glass certificate ([§4.6](#46-break-glass-revocation)).
 - The controller applies the change only after its `SECURITY_CONFIGURATION_CHANGE` audit record is durable. If the audit write fails, the request fails and the previous set stays in force. Retry on that controller.
 - A `200` response reports `trustBundleVersion`, `loadedAt` and `revokedCertificateCount`. Check the count against the set you sent.
+
+### 4.6 Break-glass revocation
+
+Use this when the gateway is unavailable, or its own identity is revoked, and a certificate must be revoked. It needs break-glass bindings and a pinned issuing CA configured beforehand ([Security Deployment Guide §4.3](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md#43-break-glass-certificate-bindings)); custody of that CA's offline key is the approval.
+
+1. Mint a certificate for a configured break-glass subject from the pinned CA, with a lifetime within `quorus.security.break-glass.max-certificate-lifetime` (one hour by default). Record its serial and `notAfter` in the incident.
+2. Confirm the identity on each controller with `GET /api/v1/security/me`: principal as bound, tenant and environment `platform`, and `elevationExpiresAt` equal to the certificate's `notAfter`.
+3. Build the complete replacement set: every serial in `quorus.security.revoked-certificate-serials`, every serial revoked earlier in this incident, and the serials to revoke now. The API reports only the set's size, so the configuration and the incident record are the source of the list.
+4. Send it with `PUT /api/v1/security/trust/revocations` ([§4.5](#45-revocation-request)) to **every controller**. Followers accept it, so this works with no leader. Check each controller's `revokedCertificateCount` on `GET /api/v1/security/trust`.
+5. Add the same set to every controller's configuration before any restart, as for any runtime revocation.
+6. When the incident no longer needs it, add the break-glass certificate's own serial to the set, or let it expire.
+7. Preserve each controller's `BREAK_GLASS_AUTHENTICATION` and `SECURITY_CONFIGURATION_CHANGE` audit records. Investigate any `Q-AUTHN-BREAK-GLASS-REFUSED` record: a break-glass subject from another CA, or a pinned-CA certificate with another subject, may signal a compromise.
+
+A request outside the four incident scopes (`security:trust:write`, `security:trust:read`, `security:self:read`, `security:explain`) is refused with `403`. Service-connection and secret-reference changes, and reading security events, still need the gateway.
 
 ## 5. Expiry and hostname incidents
 
@@ -129,4 +143,4 @@ Before closing containment, verify:
 
 ## 8. Closure evidence
 
-Record incident timeline, affected identities and resources, revocation effective time, replacement certificate fingerprints, trust-bundle versions, controller restart order, quorum evidence, agent drain and reconciliation results, negative-test results, audit-chain result, residual risk, and follow-up owner. Private keys and external authentication credentials must never appear in the closure record.
+Record incident timeline, affected identities and resources, revocation effective time, replacement certificate fingerprints, any break-glass certificate serials with their `notAfter` and audit records, trust-bundle versions, controller restart order, quorum evidence, agent drain and reconciliation results, negative-test results, audit-chain result, residual risk, and follow-up owner. Private keys and external authentication credentials must never appear in the closure record.

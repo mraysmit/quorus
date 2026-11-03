@@ -2,8 +2,8 @@
 
 # Quorus Security Deployment Guide
 
-**Version:** 1.9  
-**Date:** 2026-10-03  
+**Version:** 1.10  
+**Date:** 2026-11-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Phase 1 implementation guide  
@@ -119,9 +119,27 @@ quorus.security.revoked-certificate-serials=01AF44,09BC20
 
 Leading zeroes and colon separators are ignored when serials are compared, so OpenSSL forms such as `01:AF:44` match the certificate serial `1AF44`.
 
-An actively elevated `SECURITY` or `ADMINISTRATOR` identity, or one granted the `security:trust:write` scope with elevation, can atomically replace the runtime serial set with `PUT /api/v1/security/trust/revocations`. Only gateway-asserted identities can hold elevation; configured certificate bindings cannot. The request includes a new `trustBundleVersion` and the complete replacement `revokedCertificateSerials` array, which is required: a request without it is rejected with `400` and changes nothing. The controller applies the new set only after the change's audit record is durable, and the audit record lists the serials.
+An actively elevated `SECURITY` or `ADMINISTRATOR` identity, or one granted the `security:trust:write` scope with elevation, can atomically replace the runtime serial set with `PUT /api/v1/security/trust/revocations`. Ordinary certificate bindings never hold elevation; a gateway-asserted identity can, and so can a break-glass certificate ([§4.3](#43-break-glass-certificate-bindings)). The request includes a new `trustBundleVersion` and the complete replacement `revokedCertificateSerials` array, which is required: a request without it is rejected with `400` and changes nothing. The controller applies the new set only after the change's audit record is durable, and the audit record lists the serials.
 
 The new state applies only to the controller that receives the request, where it is shared by that process's HTTP and Raft enforcement and applies to subsequent requests or RPCs on already-established TLS connections. Every controller accepts the request, followers included. It is held in memory, is not replicated, and is lost when that controller restarts. Send the complete replacement set to every controller and also add it to configuration before any restart. Because this is replacement rather than merge behavior, operators must supply every serial that must remain revoked. The [Certificate Incident Runbook §4.5](QUORUS_CERTIFICATE_INCIDENT_RUNBOOK.md#45-revocation-request) gives an example request.
+
+### 4.3 Break-glass certificate bindings
+
+Break-glass bindings let an operator revoke certificates when the gateway is unavailable, or after the gateway's own identity is revoked ([ADR-0013](../docs-design/architecture-decisions/ADR-0013-BREAK-GLASS-ELEVATION.md)). They are off until configured:
+
+```properties
+quorus.security.break-glass-identities=CN=Incident Responder,OU=Break Glass,O=Cityline Ltd,C=GB=>incident-responder|security:trust:write+security:trust:read+security:self:read+security:explain
+quorus.security.break-glass.issuer-sha256=3F:9A:...:C1
+quorus.security.break-glass.max-certificate-lifetime=PT1H
+```
+
+- **Format.** Each binding is `subject=>principal|scopes`, separated by semicolons. A break-glass identity is a `HUMAN` with tenant and environment `platform` and no roles. Its scopes may only be `security:trust:write`, `security:trust:read`, `security:self:read` and `security:explain`; startup fails for any other scope, including `security-events:read` and wildcards.
+- **Pinned issuer.** `issuer-sha256` lists the SHA-256 fingerprints of the CA certificates that may issue break-glass certificates; colons and case are ignored. Each pinned CA certificate must be in the HTTP trust bundle and must sign break-glass certificates directly, because intermediate CAs are not supported. Run a dedicated CA whose key the security team holds offline, and have it issue serials of at least 64 random bits, because revocation is keyed by serial alone. Startup fails if bindings are configured with no pin, or if a pin is not in the trust bundle.
+- **Elevation window.** A break-glass certificate elevates until its own `notAfter`, so its lifetime is the elevation window. A certificate whose lifetime (`notAfter` minus `notBefore`) exceeds `max-certificate-lifetime` is refused. The default is `PT1H`, and startup fails above `PT4H`. There is no activation step: mint a certificate for the incident, and revoke its serial or let it expire.
+- **Refusals.** A break-glass subject from any other CA, a certificate over the lifetime limit, and a certificate from a pinned CA with any other subject are refused with `401` and the audit code `Q-AUTHN-BREAK-GLASS-REFUSED`, with `reason` `unpinned-issuer`, `lifetime-exceeded` or `unbound-subject`. A pinned CA can therefore never issue an ordinary binding or a gateway identity.
+- **Exclusive subjects.** A subject may appear in only one of `trusted-gateway-subjects`, `mtls-identities` and `break-glass-identities`; startup fails otherwise. This also refuses a subject listed both as a gateway and as an ordinary binding, which earlier versions silently treated as the gateway.
+- **Audit and monitoring.** Each accepted request writes a `BREAK_GLASS_AUTHENTICATION` record with the certificate serial, the pinned issuer's fingerprint and `notAfter`, logs a `WARN` line, and increments `quorus.security.break_glass.requests`; each refusal increments `quorus.security.break_glass.refusals`. When bindings are configured, startup logs a `WARN` line and writes a `SECURITY_CONFIGURATION` record listing the subjects, pinned issuers and limit. Alert on any of these.
+- **Every controller.** Break-glass holds no state and the audit log is local, so the same certificate works on every controller, followers included, even with no leader.
 
 ## 5. Agent production configuration
 
@@ -200,6 +218,7 @@ The release evidence must show rejection of:
 - missing or expired gateway assertions;
 - wrong tenant, environment, role, or scope;
 - an agent acting for another agent ID;
+- a break-glass subject from an unpinned CA, a break-glass certificate over the lifetime limit, a pinned-CA certificate with a non-break-glass subject, and an ordinary binding attempting an elevated operation;
 - cross-tenant list, item, route, assignment, polling, heartbeat, and status access;
 - production startup with disabled authentication, disabled TLS, `allow-insecure=true`, missing trust material, or no identity source.
 

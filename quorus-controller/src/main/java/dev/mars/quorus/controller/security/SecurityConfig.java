@@ -32,7 +32,8 @@ public record SecurityConfig(
         String trustBundleVersion,
         Duration certificateExpiryWarningThreshold,
         Path auditEvidencePath,
-        Path auditLogPath) {
+        Path auditLogPath,
+        BreakGlassConfig breakGlass) {
 
     public SecurityConfig {
         trustedGatewaySubjects = Set.copyOf(trustedGatewaySubjects == null ? Set.of() : trustedGatewaySubjects);
@@ -41,6 +42,7 @@ public record SecurityConfig(
         trustBundleVersion = trustBundleVersion == null ? "configuration" : trustBundleVersion.trim();
         certificateExpiryWarningThreshold = certificateExpiryWarningThreshold == null
                 ? Duration.ofDays(30) : certificateExpiryWarningThreshold;
+        breakGlass = breakGlass == null ? BreakGlassConfig.disabled() : breakGlass;
     }
 
     public SecurityConfig(SecurityProfile profile, boolean enabled, boolean allowInsecure, boolean httpTlsEnabled,
@@ -49,7 +51,7 @@ public record SecurityConfig(
                           Map<String, SecurityIdentity> mtlsIdentities, Path auditLogPath) {
         this(profile, enabled, allowInsecure, httpTlsEnabled, httpCertificate, httpPrivateKey, httpTrustBundle,
                 httpCrl, trustedGatewaySubjects, revokedCertificateSerials, mtlsIdentities, "configuration",
-                Duration.ofDays(30), evidencePath(auditLogPath), auditLogPath);
+                Duration.ofDays(30), evidencePath(auditLogPath), auditLogPath, BreakGlassConfig.disabled());
     }
 
     public static SecurityConfig from(AppConfig config) {
@@ -70,7 +72,15 @@ public record SecurityConfig(
                 config.getString("quorus.security.trust-bundle.version", "configuration"),
                 Duration.ofDays(config.getLong("quorus.security.certificate.expiry-warning-days", 30)),
                 path(config.getString("quorus.security.audit.evidence-path", "")),
-                Path.of(config.getString("quorus.security.audit.path", "./data/audit/security-audit.jsonl")));
+                Path.of(config.getString("quorus.security.audit.path", "./data/audit/security-audit.jsonl")),
+                BreakGlassConfig.from(config));
+    }
+
+    /** A copy of this configuration with the given break-glass bindings (ADR-0013). */
+    public SecurityConfig withBreakGlass(BreakGlassConfig value) {
+        return new SecurityConfig(profile, enabled, allowInsecure, httpTlsEnabled, httpCertificate, httpPrivateKey,
+                httpTrustBundle, httpCrl, trustedGatewaySubjects, revokedCertificateSerials, mtlsIdentities,
+                trustBundleVersion, certificateExpiryWarningThreshold, auditEvidencePath, auditLogPath, value);
     }
 
     /** Compatibility posture for unit/integration fixtures that predate Phase 1. */
@@ -80,6 +90,8 @@ public record SecurityConfig(
     }
 
     public void validate() {
+        requireDistinctIdentitySubjects();
+        breakGlass.validate(httpTrustBundle);
         if (profile == SecurityProfile.PRODUCTION) {
             if (!enabled) fail("Production cannot disable request security");
             if (allowInsecure) fail("Production cannot enable insecure transport");
@@ -101,6 +113,20 @@ public record SecurityConfig(
             }
         } else if ((!enabled || !httpTlsEnabled) && !allowInsecure) {
             fail("Development security or TLS may be disabled only with quorus.security.allow-insecure=true");
+        }
+    }
+
+    /** ADR-0013 item 6: a subject resolves to exactly one identity source. */
+    private void requireDistinctIdentitySubjects() {
+        for (String subject : mtlsIdentities.keySet()) {
+            if (trustedGatewaySubjects.contains(subject)) {
+                fail("Certificate subject " + subject + " is both a trusted gateway and a direct mTLS identity");
+            }
+        }
+        for (String subject : breakGlass.bindings().keySet()) {
+            if (trustedGatewaySubjects.contains(subject) || mtlsIdentities.containsKey(subject)) {
+                fail("Break-glass subject " + subject + " is also a trusted gateway or a direct mTLS identity");
+            }
         }
     }
 

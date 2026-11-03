@@ -11,11 +11,13 @@ import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftNodeMode;
 import dev.mars.quorus.controller.security.AuthenticationHandler;
+import dev.mars.quorus.controller.security.BreakGlassConfig;
 import dev.mars.quorus.controller.security.IdentityType;
 import dev.mars.quorus.controller.security.SecurityConfig;
 import dev.mars.quorus.controller.security.SecurityIdentity;
 import dev.mars.quorus.controller.security.SecurityProfile;
 import dev.mars.quorus.controller.security.SecurityRole;
+import dev.mars.quorus.controller.security.TestCertificates;
 import dev.mars.quorus.controller.security.audit.AuditEvent;
 import dev.mars.quorus.controller.security.audit.AuditSink;
 import dev.mars.quorus.controller.state.AgentCommand;
@@ -723,6 +725,226 @@ class SecurityBoundaryIntegrationTest {
                         .put("allowedCidrs", new JsonArray().add("192.0.2.0/24"))
                         .put("allowedPorts", new JsonArray().add(22)).put("pinResolvedAddresses", true));
     }
+
+    // ==================== Break-glass elevation (ADR-0013, register item SEC-06) ====================
+
+    private static final String BREAK_GLASS_SUBJECT = "CN=Incident Responder,OU=Break Glass,O=Cityline Ltd,C=GB";
+    private static final String ORDINARY_SUBJECT = "CN=Security Operator,OU=Operators,O=Cityline Ltd,C=GB";
+
+    /** ADR-0013 tests 1 and 7, with the startup configuration record of item 5. */
+    @Test
+    void breakGlassCertificateFromThePinnedIssuerReplacesTheRevocationSet(Vertx vertx) throws Exception {
+        TlsMaterial tls = TlsMaterial.create(tempDir.resolve("tls"));
+        BreakGlassMaterial breakGlass = BreakGlassMaterial.create(tls, tempDir.resolve("break-glass"));
+        List<AuditEvent> events = new java.util.concurrent.CopyOnWriteArrayList<>();
+        RunningServer running = startServer(vertx, breakGlass.config(Map.of(), tempDir.resolve("bg-audit.jsonl")),
+                events::add);
+        TestCertificates.Issued certificate = breakGlass.issue(breakGlass.pinnedCa(), BREAK_GLASS_SUBJECT,
+                Duration.ofMinutes(30));
+        WebClient client = breakGlass.client(vertx, certificate);
+        try {
+            int port = running.server().actualPort();
+            HttpResponse<Buffer> me = awaitSuccess(client.get(port, "localhost", "/api/v1/security/me").send(),
+                    TIMEOUT);
+            assertEquals(200, me.statusCode());
+            String notAfter = certificate.certificate().getNotAfter().toInstant().toString();
+            assertEquals("incident-responder", me.bodyAsJsonObject().getString("principalId"));
+            assertEquals("HUMAN", me.bodyAsJsonObject().getString("identityType"));
+            assertEquals("platform", me.bodyAsJsonObject().getString("tenantId"));
+            assertEquals("platform", me.bodyAsJsonObject().getString("environment"));
+            assertEquals(new JsonArray(), me.bodyAsJsonObject().getJsonArray("roles"));
+            assertEquals(notAfter, me.bodyAsJsonObject().getString("elevationExpiresAt"));
+            assertEquals(notAfter, me.bodyAsJsonObject().getString("expiresAt"));
+
+            HttpResponse<Buffer> update = awaitSuccess(client
+                    .put(port, "localhost", "/api/v1/security/trust/revocations")
+                    .sendJsonObject(new JsonObject()
+                            .put("trustBundleVersion", "break-glass-v2")
+                            .put("revokedCertificateSerials", new JsonArray().add(tls.clientSerial()))), TIMEOUT);
+            assertEquals(200, update.statusCode());
+
+            assertTrue(events.stream().anyMatch(event -> "BREAK_GLASS_AUTHENTICATION".equals(event.eventType())
+                    && "ALLOW".equals(event.outcome())
+                    && "incident-responder".equals(event.principalId())
+                    && "platform".equals(event.tenantId())
+                    && BREAK_GLASS_SUBJECT.equals(event.certificateSubject())
+                    && certificate.serial().equals(event.attributes().get("certificateSerial"))
+                    && breakGlass.pinnedCa().sha256().equals(event.attributes().get("issuerSha256"))
+                    && notAfter.equals(event.attributes().get("certificateNotAfter"))), events.toString());
+            assertTrue(events.stream().anyMatch(event -> "SECURITY_CONFIGURATION".equals(event.eventType())
+                    && event.attributes().getOrDefault("breakGlassSubjects", "").contains(BREAK_GLASS_SUBJECT)
+                    && event.attributes().getOrDefault("breakGlassIssuerSha256", "")
+                    .contains(breakGlass.pinnedCa().sha256())), events.toString());
+        } finally {
+            client.close();
+            running.close();
+        }
+    }
+
+    /** ADR-0013 test 2. */
+    @Test
+    void breakGlassSubjectFromAnotherTrustedIssuerIsRefused(Vertx vertx) throws Exception {
+        assertBreakGlassRefused(vertx, Map.of(), material -> material.issue(material.otherCa(), BREAK_GLASS_SUBJECT,
+                Duration.ofMinutes(30)), "unpinned-issuer");
+    }
+
+    /** ADR-0013 test 3: the default limit is one hour. */
+    @Test
+    void breakGlassCertificateLongerLivedThanTheLimitIsRefused(Vertx vertx) throws Exception {
+        assertBreakGlassRefused(vertx, Map.of(), material -> material.issue(material.pinnedCa(), BREAK_GLASS_SUBJECT,
+                Duration.ofHours(2)), "lifetime-exceeded");
+    }
+
+    /** ADR-0013 test 6: a pinned-issuer certificate can never authenticate as an ordinary binding. */
+    @Test
+    void pinnedIssuerCertificateWithAnOrdinaryBindingSubjectIsRefused(Vertx vertx) throws Exception {
+        SecurityIdentity ordinary = new SecurityIdentity("security-operator", IdentityType.HUMAN,
+                "regulated-bank-a", "production", Set.of(SecurityRole.SECURITY), Set.of("*"), ORDINARY_SUBJECT,
+                Instant.now(), null, null);
+        assertBreakGlassRefused(vertx, Map.of(ORDINARY_SUBJECT, ordinary), material -> material.issue(
+                material.pinnedCa(), ORDINARY_SUBJECT, Duration.ofMinutes(30)), "unbound-subject");
+    }
+
+    /** ADR-0013 test 4. */
+    @Test
+    void breakGlassIdentityIsRefusedAScopeOutsideTheIncidentSet(Vertx vertx) throws Exception {
+        TlsMaterial tls = TlsMaterial.create(tempDir.resolve("tls"));
+        BreakGlassMaterial breakGlass = BreakGlassMaterial.create(tls, tempDir.resolve("break-glass"));
+        List<AuditEvent> events = new java.util.concurrent.CopyOnWriteArrayList<>();
+        RunningServer running = startServer(vertx, breakGlass.config(Map.of(), tempDir.resolve("scope-audit.jsonl")),
+                events::add);
+        WebClient client = breakGlass.client(vertx, breakGlass.issue(breakGlass.pinnedCa(), BREAK_GLASS_SUBJECT,
+                Duration.ofMinutes(30)));
+        try {
+            HttpResponse<Buffer> submit = awaitSuccess(client
+                    .post(running.server().actualPort(), "localhost", "/api/v1/transfers")
+                    .sendJsonObject(new JsonObject().put("sourceUri", "https://example.test/a.dat")), TIMEOUT);
+            assertEquals(403, submit.statusCode());
+            assertTrue(events.stream().anyMatch(event -> "AUTHORIZATION".equals(event.eventType())
+                    && "DENY".equals(event.outcome()) && "Q-AUTHZ-SCOPE-MISSING".equals(event.decisionCode())
+                    && "incident-responder".equals(event.principalId())), events.toString());
+        } finally {
+            client.close();
+            running.close();
+        }
+    }
+
+    /**
+     * ADR-0013 test 5 (item 6): an ordinary direct binding never elevates, even with the SECURITY role and
+     * every scope. This characterizes existing behaviour, so it passed before SEC-06; it pins it.
+     */
+    @Test
+    void ordinaryBindingIsRefusedTrustWriteForWantOfElevation(Vertx vertx) throws Exception {
+        TlsMaterial tls = TlsMaterial.create(tempDir.resolve("tls"));
+        BreakGlassMaterial breakGlass = BreakGlassMaterial.create(tls, tempDir.resolve("break-glass"));
+        SecurityIdentity ordinary = new SecurityIdentity("security-operator", IdentityType.HUMAN,
+                "regulated-bank-a", "production", Set.of(SecurityRole.SECURITY), Set.of("*"), ORDINARY_SUBJECT,
+                Instant.now(), null, null);
+        List<AuditEvent> events = new java.util.concurrent.CopyOnWriteArrayList<>();
+        RunningServer running = startServer(vertx, breakGlass.config(Map.of(ORDINARY_SUBJECT, ordinary),
+                tempDir.resolve("ordinary-audit.jsonl")), events::add);
+        WebClient client = breakGlass.client(vertx, breakGlass.issue(breakGlass.otherCa(), ORDINARY_SUBJECT,
+                Duration.ofMinutes(30)));
+        try {
+            HttpResponse<Buffer> update = awaitSuccess(client
+                    .put(running.server().actualPort(), "localhost", "/api/v1/security/trust/revocations")
+                    .sendJsonObject(new JsonObject().put("trustBundleVersion", "ordinary-v2")
+                            .put("revokedCertificateSerials", new JsonArray())), TIMEOUT);
+            assertEquals(403, update.statusCode());
+            assertTrue(events.stream().anyMatch(event -> "AUTHORIZATION".equals(event.eventType())
+                    && "Q-AUTHZ-ELEVATION-REQUIRED".equals(event.decisionCode())), events.toString());
+        } finally {
+            client.close();
+            running.close();
+        }
+    }
+
+    /** ADR-0013 test 8 (item 7): break-glass holds no state, so a follower accepts it with no leader's help. */
+    @Test
+    void followerAcceptsABreakGlassRevocationUpdate(Vertx vertx) throws Exception {
+        TlsMaterial tls = TlsMaterial.create(tempDir.resolve("tls"));
+        BreakGlassMaterial breakGlass = BreakGlassMaterial.create(tls, tempDir.resolve("break-glass"));
+        try (RunningCluster cluster = startServerOnFollower(vertx,
+                breakGlass.config(Map.of(), tempDir.resolve("follower-bg-audit.jsonl")))) {
+            WebClient client = breakGlass.client(vertx, breakGlass.issue(breakGlass.pinnedCa(), BREAK_GLASS_SUBJECT,
+                    Duration.ofMinutes(30)));
+            try {
+                HttpResponse<Buffer> update = awaitSuccess(client
+                        .put(cluster.server().actualPort(), "localhost", "/api/v1/security/trust/revocations")
+                        .sendJsonObject(new JsonObject().put("trustBundleVersion", "follower-bg-v2")
+                                .put("revokedCertificateSerials", new JsonArray().add(tls.clientSerial()))), TIMEOUT);
+                assertEquals(200, update.statusCode());
+            } finally {
+                client.close();
+            }
+        }
+    }
+
+    @FunctionalInterface
+    private interface CertificateChoice {
+        TestCertificates.Issued choose(BreakGlassMaterial material) throws Exception;
+    }
+
+    private void assertBreakGlassRefused(Vertx vertx, Map<String, SecurityIdentity> identities,
+                                         CertificateChoice choice, String reason) throws Exception {
+        TlsMaterial tls = TlsMaterial.create(tempDir.resolve("tls"));
+        BreakGlassMaterial breakGlass = BreakGlassMaterial.create(tls, tempDir.resolve("break-glass"));
+        List<AuditEvent> events = new java.util.concurrent.CopyOnWriteArrayList<>();
+        RunningServer running = startServer(vertx, breakGlass.config(identities,
+                tempDir.resolve("refused-audit.jsonl")), events::add);
+        TestCertificates.Issued certificate = choice.choose(breakGlass);
+        WebClient client = breakGlass.client(vertx, certificate);
+        try {
+            HttpResponse<Buffer> me = awaitSuccess(client
+                    .get(running.server().actualPort(), "localhost", "/api/v1/security/me").send(), TIMEOUT);
+            assertEquals(401, me.statusCode());
+            assertTrue(events.stream().anyMatch(event -> "AUTHENTICATION".equals(event.eventType())
+                    && "DENY".equals(event.outcome())
+                    && "Q-AUTHN-BREAK-GLASS-REFUSED".equals(event.decisionCode())
+                    && certificate.subject().equals(event.certificateSubject())
+                    && certificate.serial().equals(event.attributes().get("certificateSerial"))
+                    && reason.equals(event.attributes().get("reason"))), events.toString());
+        } finally {
+            client.close();
+            running.close();
+        }
+    }
+
+    /** A pinned break-glass CA, a second trusted CA, and a trust bundle holding both and the fixture client. */
+    private record BreakGlassMaterial(TlsMaterial tls, Path directory, TestCertificates.Issued pinnedCa,
+                                      TestCertificates.Issued otherCa, Path trustBundle) {
+        static BreakGlassMaterial create(TlsMaterial tls, Path directory) throws Exception {
+            TestCertificates.Issued pinned = TestCertificates.certificateAuthority(
+                    "CN=Quorus Break Glass CA,O=Cityline Ltd,C=GB");
+            TestCertificates.Issued other = TestCertificates.certificateAuthority(
+                    "CN=Quorus Operator CA,O=Cityline Ltd,C=GB");
+            Path bundle = TestCertificates.writeBundle(directory.resolve("trust-bundle.pem"),
+                    TlsMaterial.readCertificate(tls.clientCertificate()), pinned.certificate(), other.certificate());
+            return new BreakGlassMaterial(tls, directory, pinned, other, bundle);
+        }
+
+        SecurityConfig config(Map<String, SecurityIdentity> identities, Path auditPath) {
+            Map<String, SecurityIdentity> bindings = new java.util.HashMap<>(identities);
+            bindings.putIfAbsent(tls.clientSubject(), directIdentity(tls.clientSubject()));
+            return tls.configWithTrust(trustBundle, Set.of(), Set.of(), bindings, auditPath)
+                    .withBreakGlass(new BreakGlassConfig(Map.of(BREAK_GLASS_SUBJECT,
+                            new BreakGlassConfig.Binding("incident-responder", BreakGlassConfig.ALLOWED_SCOPES)),
+                            Set.of(pinnedCa.sha256()), null));
+        }
+
+        TestCertificates.Issued issue(TestCertificates.Issued issuer, String subject, Duration lifetime)
+                throws Exception {
+            Instant notBefore = Instant.now().minusSeconds(60).truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+            return TestCertificates.issue(issuer, subject, notBefore, notBefore.plus(lifetime));
+        }
+
+        WebClient client(Vertx vertx, TestCertificates.Issued certificate) throws Exception {
+            String name = "client-" + certificate.serial();
+            return tls.clientWith(vertx, certificate.writeCertificate(directory.resolve(name + ".pem")),
+                    certificate.writePrivateKey(directory.resolve(name + "-key.pem")));
+        }
+    }
+
     private static RunningServer startServer(Vertx vertx, SecurityConfig config, AuditSink auditSink) {
         config.validate();
         String nodeId = "security-boundary-" + System.nanoTime();
@@ -864,6 +1086,13 @@ class SecurityBoundaryIntegrationTest {
                     .setKeyCertOptions(new PemKeyCertOptions()
                             .setCertPath(serverCertificate.toString())
                             .setKeyPath(serverPrivateKey.toString())));
+        }
+
+        WebClient clientWith(Vertx vertx, Path certificate, Path privateKey) {
+            return WebClient.create(vertx, baseOptions()
+                    .setKeyCertOptions(new PemKeyCertOptions()
+                            .setCertPath(certificate.toString())
+                            .setKeyPath(privateKey.toString())));
         }
 
         private WebClientOptions baseOptions() {
