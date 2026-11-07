@@ -21,8 +21,8 @@ def mavenLane(String lane, String goals) {
 set -uo pipefail
 mkdir -p logs
 log="logs/quorus-$LANE-$(date -u +%Y-%m-%d_%H-%M-%S)-$BUILD_NUMBER.log"
-# GOALS and LENIENT are word lists, so they are expanded unquoted.
-mvn -B --fail-at-end -Dstyle.color=never -Dmaven.repo.local="$MAVEN_REPO" $LENIENT $GOALS 2>&1 | tee "$log"
+# GOALS and LENIENT are word lists, so they are expanded unquoted. Jenkins leaves an empty LENIENT unset.
+mvn -B --fail-at-end -Dstyle.color=never -Dmaven.repo.local="$MAVEN_REPO" ${LENIENT:-} $GOALS 2>&1 | tee "$log"
 status="${PIPESTATUS[0]}"
 grep 'Rule violated' "$log" > "logs/coverage-violations-$LANE.txt" || rm -f -- "logs/coverage-violations-$LANE.txt"
 exit "$status"
