@@ -190,16 +190,19 @@ class QuorusConfigurationTest {
 
     // ========== Type Conversion Tests ==========
 
+    /** Register item CFG-03: a malformed number is rejected instead of falling back to the default. */
     @Test
-    void testInvalidIntegerPropertyUsesDefault() {
-        assertEquals(10, configWith("quorus.transfer.max.concurrent", "not-a-number")
-                .getMaxConcurrentTransfers());
+    void testInvalidIntegerPropertyIsRejected() {
+        IllegalStateException error = assertThrows(IllegalStateException.class,
+                () -> configWith("quorus.transfer.buffer.size", "not-a-number").getBufferSize());
+        assertTrue(error.getMessage().contains("quorus.transfer.buffer.size"), error.getMessage());
     }
 
     @Test
-    void testInvalidLongPropertyUsesDefault() {
-        assertEquals(10L * 1024 * 1024 * 1024,
-                configWith("quorus.file.max.size", "invalid-long").getMaxFileSize());
+    void testInvalidLongPropertyIsRejected() {
+        IllegalStateException error = assertThrows(IllegalStateException.class,
+                () -> configWith("quorus.file.max.size", "invalid-long").getMaxFileSize());
+        assertTrue(error.getMessage().contains("quorus.file.max.size"), error.getMessage());
     }
 
     @Test
@@ -213,7 +216,17 @@ class QuorusConfigurationTest {
     void testBooleanPropertyFalseVariations() {
         assertFalse(configWith("quorus.monitoring.metrics.enabled", "false").isMetricsEnabled());
         assertFalse(configWith("quorus.monitoring.metrics.enabled", "FALSE").isMetricsEnabled());
-        assertFalse(configWith("quorus.monitoring.metrics.enabled", "anything-else").isMetricsEnabled());
+    }
+
+    /** Register item CFG-06: a value other than true or false is rejected, not read as false. */
+    @Test
+    void testBooleanPropertyRejectsOtherValues() {
+        for (String invalid : new String[]{"anything-else", "yes", "1"}) {
+            QuorusConfiguration invalidConfig = configWith("quorus.monitoring.metrics.enabled", invalid);
+            IllegalStateException error = assertThrows(IllegalStateException.class,
+                    invalidConfig::isMetricsEnabled, invalid);
+            assertTrue(error.getMessage().contains("quorus.monitoring.metrics.enabled"), error.getMessage());
+        }
     }
 
     @Test
@@ -308,6 +321,32 @@ class QuorusConfigurationTest {
         QuorusConfiguration second = configWith("quorus.transfer.max.concurrent", "7");
         assertEquals(99, first.getMaxConcurrentTransfers());
         assertEquals(7, second.getMaxConcurrentTransfers());
+    }
+
+    // ========== Environment layer (register item CFG-05) ==========
+
+    @Test
+    void testEnvironmentLayerIsInjectable() {
+        QuorusConfiguration fromEnvironment = new QuorusConfiguration("test", new Properties(),
+                java.util.Map.of("QUORUS_TRANSFER_MAX_CONCURRENT", "42"));
+        assertEquals(42, fromEnvironment.getMaxConcurrentTransfers());
+    }
+
+    @Test
+    void testExplicitOverrideBeatsEnvironment() {
+        Properties overrides = new Properties();
+        overrides.setProperty("quorus.transfer.max.concurrent", "7");
+        QuorusConfiguration configured = new QuorusConfiguration("test", overrides,
+                java.util.Map.of("QUORUS_TRANSFER_MAX_CONCURRENT", "42"));
+        assertEquals(7, configured.getMaxConcurrentTransfers());
+    }
+
+    @Test
+    void testEnvironmentReachesKeysAbsentFromResources() {
+        QuorusConfiguration configured = new QuorusConfiguration("test", new Properties(),
+                java.util.Map.of("QUORUS_CUSTOM_UNDECLARED_SETTING", "from-environment"));
+        assertEquals("from-environment", configured.getProperty("quorus.custom.undeclared.setting"));
+        assertEquals("from-environment", configured.getProperty("quorus.custom.undeclared.setting", "fallback"));
     }
 
     // ========== Edge Cases ==========

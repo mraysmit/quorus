@@ -343,11 +343,11 @@ public final class AppConfig {
     }
 
     public int getInt(String key, int defaultValue) {
-        return LayeredProperties.getInt(properties, environment, key, defaultValue, logger);
+        return LayeredProperties.getInt(properties, environment, key, defaultValue);
     }
 
     public long getLong(String key, long defaultValue) {
-        return LayeredProperties.getLong(properties, environment, key, defaultValue, logger);
+        return LayeredProperties.getLong(properties, environment, key, defaultValue);
     }
 
     public boolean getBoolean(String key, boolean defaultValue) {
@@ -435,6 +435,19 @@ public final class AppConfig {
             throw new IllegalStateException(
                     "Raft storage type must be 'raftlog', got: " + storageType);
         }
+
+        // Typed accessors throw on a malformed number (CFG-03) or a boolean other than true or false
+        // (CFG-06). Read the ones not checked above so that startup fails before storage is opened.
+        getHttpMaxBodyBytes();
+        getElectionTimeoutMs();
+        getHeartbeatIntervalMs();
+        getRaftStorageFsync();
+        isSnapshotEnabled();
+        getLogHardLimit();
+        isTelemetryEnabled();
+        getPrometheusPort();
+        getAssignmentInitialDelayMs();
+        getTimeoutInitialDelayMs();
 
         logger.info("Controller configuration validated successfully");
     }

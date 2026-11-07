@@ -104,6 +104,50 @@ class QuorusControllerVerticleTest {
                 });
     }
 
+    /** Register item CFG-06: a non-boolean fsync value stops startup before the WAL is opened. */
+    @Test
+    void nonBooleanFsyncValueFailsDeploymentBeforeStorageIsCreated(Vertx vertx, VertxTestContext context)
+            throws IOException {
+        int[] ports = availablePorts(2);
+        Properties properties = controllerProperties("fsync-node", ports[0], ports[1], 1_024L);
+        properties.setProperty("quorus.raft.storage.fsync", "yes");
+        java.nio.file.Path storagePath = tempDir.resolve("fsync-node");
+        AppConfig config = new AppConfig("test", properties);
+
+        vertx.deployVerticle(new QuorusControllerVerticle(config))
+                .onSuccess(deploymentId -> vertx.undeploy(deploymentId).onComplete(ignored -> context.failNow(
+                        new AssertionError("deployment must fail for quorus.raft.storage.fsync=yes"))))
+                .onFailure(cause -> {
+                    context.verify(() -> {
+                        assertTrue(String.valueOf(cause.getMessage()).contains("quorus.raft.storage.fsync"),
+                                "unexpected startup failure: " + cause);
+                        assertFalse(java.nio.file.Files.exists(storagePath),
+                                "Raft storage must not be created before configuration is rejected");
+                    });
+                    context.completeNow();
+                });
+    }
+
+    /** Register item CFG-03: a malformed number fails deployment instead of starting with the default. */
+    @Test
+    void malformedNumberFailsDeploymentInsteadOfUsingTheDefault(Vertx vertx, VertxTestContext context)
+            throws IOException {
+        int[] ports = availablePorts(2);
+        Properties properties = controllerProperties("malformed-node", ports[0], ports[1], 1_024L);
+        properties.setProperty("quorus.raft.election-timeout-ms", "5s");
+        AppConfig config = new AppConfig("test", properties);
+
+        vertx.deployVerticle(new QuorusControllerVerticle(config))
+                .onSuccess(deploymentId -> vertx.undeploy(deploymentId).onComplete(ignored -> context.failNow(
+                        new AssertionError("deployment must fail for quorus.raft.election-timeout-ms=5s"))))
+                .onFailure(cause -> {
+                    context.verify(() -> assertTrue(
+                            String.valueOf(cause.getMessage()).contains("quorus.raft.election-timeout-ms"),
+                            "unexpected startup failure: " + cause));
+                    context.completeNow();
+                });
+    }
+
     private AppConfig controllerConfig(String nodeId, int httpPort, int raftPort, long maxBodyBytes) {
         return new AppConfig("test", controllerProperties(nodeId, httpPort, raftPort, maxBodyBytes));
     }

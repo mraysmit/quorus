@@ -167,14 +167,56 @@ class AppConfigNodeIdentityTest {
         assertEquals(100_000L, config.getLogHardLimit());
     }
 
+    /** Register item CFG-03: a malformed number is a configuration error, not a silent fallback. */
     @Test
-    @DisplayName("Malformed numeric overrides fall back instead of destabilizing startup")
-    void malformedNumericOverridesUseDeclaredFallbacks() {
+    @DisplayName("Malformed numeric values are rejected instead of falling back to the default")
+    void malformedNumericValuesAreRejected() {
         String key = "quorus.test.invalid-number";
         AppConfig config = new AppConfig("test", properties(key, "not-a-number"));
 
-        assertEquals(17, config.getInt(key, 17));
-        assertEquals(23L, config.getLong(key, 23L));
+        IllegalStateException intError = assertThrows(IllegalStateException.class, () -> config.getInt(key, 17));
+        assertTrue(intError.getMessage().contains(key) && intError.getMessage().contains("'not-a-number'"),
+                intError.getMessage());
+        IllegalStateException longError = assertThrows(IllegalStateException.class,
+                () -> config.getLong(key, 23L));
+        assertTrue(longError.getMessage().contains(key), longError.getMessage());
+    }
+
+    /** Register item CFG-03: validation reads every typed accessor, so main fails before deployment. */
+    @Test
+    @DisplayName("Validation rejects a malformed number in a typed setting")
+    void validateRejectsAMalformedNumber() {
+        AppConfig config = new AppConfig("test", properties("quorus.raft.election-timeout-ms", "5s"));
+
+        IllegalStateException error = assertThrows(IllegalStateException.class, config::validate);
+        assertTrue(error.getMessage().contains("quorus.raft.election-timeout-ms"), error.getMessage());
+    }
+
+    /** Register item CFG-06: only true or false, ignoring case and surrounding space, is a boolean. */
+    @Test
+    @DisplayName("A boolean setting accepts only true or false")
+    void booleanSettingsAcceptOnlyTrueOrFalse() {
+        String key = "quorus.test.flag";
+        assertTrue(new AppConfig("test", properties(key, " TRUE ")).getBoolean(key, false));
+        assertFalse(new AppConfig("test", properties(key, "False")).getBoolean(key, true));
+
+        for (String invalid : new String[]{"yes", "1", "on", "ture"}) {
+            AppConfig config = new AppConfig("test", properties(key, invalid));
+            IllegalStateException error = assertThrows(IllegalStateException.class,
+                    () -> config.getBoolean(key, true), invalid);
+            assertTrue(error.getMessage().contains(key) && error.getMessage().contains("'" + invalid + "'"),
+                    error.getMessage());
+        }
+    }
+
+    /** Register item CFG-06: fsync=yes used to read as false and turn WAL durability off. */
+    @Test
+    @DisplayName("Validation rejects a non-boolean fsync value instead of disabling durability")
+    void validateRejectsANonBooleanFsyncValue() {
+        AppConfig config = new AppConfig("test", properties("quorus.raft.storage.fsync", "yes"));
+
+        IllegalStateException error = assertThrows(IllegalStateException.class, config::validate);
+        assertTrue(error.getMessage().contains("quorus.raft.storage.fsync"), error.getMessage());
     }
 
     @Test
@@ -188,6 +230,21 @@ class AppConfigNodeIdentityTest {
         assertEquals(45_000L, config.getAttemptLeaseDurationMs());
         assertEquals(250, config.getRaftIoQueueSize());
         assertEquals(7_500L, config.getSnapshotCheckIntervalMs());
+    }
+
+    /**
+     * Register item CFG-04, closed by design (ADR-0007 item 2): a blank environment variable counts as
+     * unset, so the lower layer's value stands. The test profile sets fsync=false; the accessor default is
+     * true. Retrospective characterization: the behaviour predates this test.
+     */
+    @Test
+    @DisplayName("A blank environment variable leaves the lower layer's value in place")
+    void blankEnvironmentValueCountsAsUnset() {
+        AppConfig config = new AppConfig("test", new Properties(),
+                Map.of("QUORUS_RAFT_STORAGE_FSYNC", "", "QUORUS_HTTP_PORT", "   "));
+
+        assertFalse(config.getRaftStorageFsync(), "profile value must stand");
+        assertEquals(8080, config.getHttpPort(), "packaged value must stand");
     }
 
     @Test

@@ -8,7 +8,7 @@
 **License:** Apache 2.0  
 **Status:** Index of every ADR in this directory
 
-An ADR records one decision, why it was taken and what it rules out. A decision stands until a later ADR supersedes it. The open decisions, and the tasks that deliver each ADR, are in the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-11-03.md#3-decision-log).
+An ADR records one decision, why it was taken and what it rules out. A decision stands until a later ADR supersedes it. The open decisions, and the tasks that deliver each ADR, are in the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-11-07.md#3-decision-log).
 
 | ADR | Decision | Status | Last revised | Supersedes / superseded by |
 |---|---|---|---|---|
@@ -18,7 +18,7 @@ An ADR records one decision, why it was taken and what it rules out. A decision 
 | [ADR-0004](ADR-0004-SECRET-PROVIDERS.md) | Secret provider boundary | Accepted; implemented in Phase 4 | 2026-09-01 | — |
 | [ADR-0005](ADR-0005-DEPLOYMENT-OWNERSHIP.md) | Agent deployment ownership | Accepted direction; implementation begins in Phase 5 | 2026-09-01 | — |
 | [ADR-0006](ADR-0006-RAFT-STORAGE-RAFTLOG-AND-SNAPSHOT-SIDECAR.md) | Raft storage on raftlog-core with a Quorus snapshot sidecar | Accepted; records the current design | 2026-11-03 | To be superseded by ADR-0011 at `CE-10` |
-| [ADR-0007](ADR-0007-LAYERED-CONFIGURATION.md) | Layered configuration without system properties | Accepted | 2026-11-03 | — |
+| [ADR-0007](ADR-0007-LAYERED-CONFIGURATION.md) | Layered configuration without system properties | Accepted | 2026-11-07 | — |
 | [ADR-0008](ADR-0008-SCHEMA-3-COORDINATED-UPGRADE.md) | Schema 3 requires a coordinated upgrade | Accepted | 2026-11-03 | — |
 | [ADR-0009](ADR-0009-RUNTIME-TRUST-STATE-SCOPE.md) | Runtime trust state is node-local | Accepted | 2026-11-03 | — |
 | [ADR-0010](ADR-0010-WORKFLOW-YAML-SEMANTICS.md) | Workflow YAML semantics | Accepted | 2026-11-03 | — |

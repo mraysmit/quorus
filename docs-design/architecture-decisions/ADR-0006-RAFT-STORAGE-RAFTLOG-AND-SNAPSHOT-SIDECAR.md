@@ -7,7 +7,7 @@
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0
 
-**Status:** Accepted. It records the storage design in force since 2026-09-04 (commits `1439456e`, `606b37c0` and `921c741d`), written down under register item DR-D4 in the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-11-03.md). **Planned successor:** [ADR-0011](ADR-0011-CONSENSUS-VIA-QRAFT-GENERIC-ENGINE.md). After register item `CE-10`, QRaft owns the log, compaction and snapshot publication, and this ADR becomes history.
+**Status:** Accepted. It records the storage design in force since 2026-09-04 (commits `1439456e`, `606b37c0` and `921c741d`), written down under register item DR-D4 in the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-11-07.md). **Planned successor:** [ADR-0011](ADR-0011-CONSENSUS-VIA-QRAFT-GENERIC-ENGINE.md). After register item `CE-10`, QRaft owns the log, compaction and snapshot publication, and this ADR becomes history.
 
 **Relates to:** [Architecture Specification §5.5](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#55-persistence-requirements), the normative persistence requirements; the [Raft Storage Reference](../reference/QUORUS_RAFT_STORAGE_REFERENCE.md), which describes the files, configuration, recovery order, operator rules and tests in detail. This ADR records why the design is what it is.
 

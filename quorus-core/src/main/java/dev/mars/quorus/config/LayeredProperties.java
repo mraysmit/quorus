@@ -1,8 +1,6 @@
 /* Copyright 2026 Mark Andrew Ray-Smith Cityline Ltd. Licensed under Apache-2.0. */
 package dev.mars.quorus.config;
 
-import org.slf4j.Logger;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Locale;
@@ -46,33 +44,42 @@ public final class LayeredProperties {
     }
 
     public static int getInt(Properties source, Map<String, String> environment, String key,
-                             int defaultValue, Logger logger) {
+                             int defaultValue) {
         String value = getString(source, environment, key, null);
         if (value == null) return defaultValue;
         try {
             return Integer.parseInt(value.trim());
         } catch (NumberFormatException error) {
-            logger.warn("Invalid integer value for {}: '{}', using default {}", key, value, defaultValue);
-            return defaultValue;
+            throw new IllegalStateException("Invalid integer value for " + key + ": '" + value.trim() + "'", error);
         }
     }
 
     public static long getLong(Properties source, Map<String, String> environment, String key,
-                               long defaultValue, Logger logger) {
+                               long defaultValue) {
         String value = getString(source, environment, key, null);
         if (value == null) return defaultValue;
         try {
             return Long.parseLong(value.trim());
         } catch (NumberFormatException error) {
-            logger.warn("Invalid long value for {}: '{}', using default {}", key, value, defaultValue);
-            return defaultValue;
+            throw new IllegalStateException("Invalid long value for " + key + ": '" + value.trim() + "'", error);
         }
     }
 
+    /**
+     * Reads a boolean that must be {@code true} or {@code false}, ignoring case and surrounding space.
+     * Any other value is a configuration error rather than {@code false} (register item CFG-06).
+     *
+     * @throws IllegalStateException if the configured value is neither {@code true} nor {@code false}
+     */
     public static boolean getBoolean(Properties source, Map<String, String> environment,
                                      String key, boolean defaultValue) {
         String value = getString(source, environment, key, null);
-        return value == null ? defaultValue : Boolean.parseBoolean(value.trim());
+        if (value == null) return defaultValue;
+        String trimmed = value.trim();
+        if (trimmed.equalsIgnoreCase("true")) return true;
+        if (trimmed.equalsIgnoreCase("false")) return false;
+        throw new IllegalStateException("Invalid boolean value for " + key + ": '" + trimmed
+                + "' (expected true or false)");
     }
 
     public static String environmentKey(String propertyKey) {

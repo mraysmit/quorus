@@ -52,10 +52,17 @@ public class QuorusConfiguration {
     
     private final Properties properties;
     private final String profile;
+    private final Map<String, String> environment;
 
     public QuorusConfiguration(String profile, Properties overrides) {
+        this(profile, overrides, System.getenv());
+    }
+
+    /** Takes the environment layer explicitly, as {@code AppConfig} and {@code AgentConfig} do (CFG-05). */
+    QuorusConfiguration(String profile, Properties overrides, Map<String, String> environment) {
         this.profile = Objects.requireNonNull(profile, "profile must not be null");
         Objects.requireNonNull(overrides, "overrides must not be null");
+        this.environment = Map.copyOf(Objects.requireNonNull(environment, "environment must not be null"));
         logger.debug("Initializing QuorusConfiguration: profile={}, overrideCount={}",
                 profile, overrides.size());
         this.properties = new Properties();
@@ -131,57 +138,35 @@ public class QuorusConfiguration {
     }
     
     // Generic property access
+    /**
+     * Returns the configured value, as-is (a blank value is returned blank). A key that no resource
+     * declares is looked up in the environment by its {@code QUORUS_*} name.
+     */
     public String getProperty(String key) {
-        return properties.getProperty(key);
+        String value = properties.getProperty(key);
+        return value != null ? value : environment.get(LayeredProperties.environmentKey(key));
     }
-    
+
     public String getProperty(String key, String defaultValue) {
-        return properties.getProperty(key, defaultValue);
+        String value = getProperty(key);
+        return value != null ? value : defaultValue;
     }
-    
+
     // Utility methods for type conversion
     private String getStringProperty(String key, String defaultValue) {
-        return properties.getProperty(key, defaultValue);
+        return getProperty(key, defaultValue);
     }
-    
+
     private int getIntProperty(String key, int defaultValue) {
-        String value = properties.getProperty(key);
-        if (value != null) {
-            try {
-                int result = Integer.parseInt(value.trim());
-                logger.debug("Retrieved int property: key={}, value={}", key, result);
-                return result;
-            } catch (NumberFormatException e) {
-                logger.warn("Invalid integer value for property {}: {}. Using default: {}", 
-                           key, value, defaultValue);
-            }
-        }
-        logger.debug("Using default int property: key={}, defaultValue={}", key, defaultValue);
-        return defaultValue;
+        return LayeredProperties.getInt(properties, environment, key, defaultValue);
     }
-    
+
     private long getLongProperty(String key, long defaultValue) {
-        String value = properties.getProperty(key);
-        if (value != null) {
-            try {
-                long result = Long.parseLong(value.trim());
-                logger.debug("Retrieved long property: key={}, value={}", key, result);
-                return result;
-            } catch (NumberFormatException e) {
-                logger.warn("Invalid long value for property {}: {}. Using default: {}", 
-                           key, value, defaultValue);
-            }
-        }
-        logger.debug("Using default long property: key={}, defaultValue={}", key, defaultValue);
-        return defaultValue;
+        return LayeredProperties.getLong(properties, environment, key, defaultValue);
     }
-    
+
     private boolean getBooleanProperty(String key, boolean defaultValue) {
-        String value = properties.getProperty(key);
-        if (value != null) {
-            return Boolean.parseBoolean(value.trim());
-        }
-        return defaultValue;
+        return LayeredProperties.getBoolean(properties, environment, key, defaultValue);
     }
     
     private void loadDefaultConfiguration() {
@@ -208,7 +193,7 @@ public class QuorusConfiguration {
     }
 
     private void applyEnvironmentOverrides() {
-        LayeredProperties.applyEnvironment(properties, System.getenv(), Map.of());
+        LayeredProperties.applyEnvironment(properties, environment, Map.of());
     }
     
     @Override

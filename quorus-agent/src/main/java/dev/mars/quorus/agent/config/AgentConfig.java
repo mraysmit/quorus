@@ -174,10 +174,10 @@ public final class AgentConfig {
 
     /**
      * Number of foreign-assignment mismatches allowed before fail-fast shutdown.
-     * Default is 3 to tolerate transient routing issues while still detecting persistent problems.
+     * Default is 1, the packaged value: the first assignment for another agent stops this one (CFG-02).
      */
     public int getForeignAssignmentMismatchThreshold() {
-        return getInt("quorus.agent.security.foreign-assignment-threshold", 3);
+        return getInt("quorus.agent.security.foreign-assignment-threshold", 1);
     }
 
     // ==================== Telemetry Configuration ====================
@@ -326,11 +326,11 @@ public final class AgentConfig {
     }
 
     public int getInt(String key, int defaultValue) {
-        return LayeredProperties.getInt(properties, environment, key, defaultValue, logger);
+        return LayeredProperties.getInt(properties, environment, key, defaultValue);
     }
 
     public long getLong(String key, long defaultValue) {
-        return LayeredProperties.getLong(properties, environment, key, defaultValue, logger);
+        return LayeredProperties.getLong(properties, environment, key, defaultValue);
     }
 
     public boolean getBoolean(String key, boolean defaultValue) {
@@ -363,7 +363,16 @@ public final class AgentConfig {
         }
     }
 
+    /** Diagnostic only: an invalid value ends the summary here and is reported by validation instead. */
     private void logConfiguration() {
+        try {
+            logConfigurationSummary();
+        } catch (IllegalStateException e) {
+            logger.warn("Configuration summary incomplete: {}", e.getMessage());
+        }
+    }
+
+    private void logConfigurationSummary() {
         logger.info("=== Quorus Agent Configuration ===");
         logger.info("  Agent ID:             {}", getAgentId());
         try { logger.info("  Tenant ID:            {}", getTenantId()); }

@@ -7,7 +7,7 @@
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0
 
-**Status:** Accepted. It records the upgrade model delivered with the R2 registry isolation on 2026-09-04 (commit `23a258c0`), written down under register item DR-D4 in the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-11-03.md).
+**Status:** Accepted. It records the upgrade model delivered with the R2 registry isolation on 2026-09-04 (commit `23a258c0`), written down under register item DR-D4 in the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-11-07.md).
 
 **Relates to:** the [Versioning and Compatibility Policy](../reference/QUORUS_VERSIONING_AND_COMPATIBILITY_POLICY.md), which holds the change rules for every versioned contract; the operator procedure in [Security Deployment Guide §11](../../docs/QUORUS_SECURITY_DEPLOYMENT_GUIDE.md#11-registry-isolation-upgrade-and-recovery); [Architecture Specification §5.3](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#53-command-invariants); [ADR-0006](ADR-0006-RAFT-STORAGE-RAFTLOG-AND-SNAPSHOT-SIDECAR.md), whose WAL and snapshot files hold the versioned data.
 

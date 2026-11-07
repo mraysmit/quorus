@@ -7,7 +7,7 @@
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0
 
-**Status:** Accepted for decisions `DR-Q1` and `ENG-Q1`, taken by project authority on 2026-10-03, in the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-11-03.md#3-decision-log). Items 6 to 9 were chosen while delivering `ENG-14` on 2026-10-18 and confirmed by the owner on 2026-11-03.
+**Status:** Accepted for decisions `DR-Q1` and `ENG-Q1`, taken by project authority on 2026-10-03, in the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER_2026-11-07.md#3-decision-log). Items 6 to 9 were chosen while delivering `ENG-14` on 2026-10-18 and confirmed by the owner on 2026-11-03.
 
 **Relates to:** the [YAML Syntax Guide](../../docs/QUORUS_YAML_SYNTAX_GUIDE.md), which is the user reference for these rules. This ADR records why the rules are what they are.
 
