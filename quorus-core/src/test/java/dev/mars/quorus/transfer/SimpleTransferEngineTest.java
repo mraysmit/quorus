@@ -148,12 +148,12 @@ class SimpleTransferEngineTest {
 
         assertNotNull(healthCheck);
         assertNotNull(healthCheck.getProtocolHealthChecks());
-        // The engine registers http, ftp, sftp and smb. The statistics come from the JVM-wide
-        // TransferTelemetryMetrics singleton, so other tests' protocols may also appear.
+        // The engine registers http, ftp, sftp and smb, and its statistics are its own (ENG-11), so
+        // no other engine's protocols appear.
         java.util.Set<String> reported = healthCheck.getProtocolHealthChecks().stream()
                 .map(dev.mars.quorus.monitoring.ProtocolHealthCheck::getProtocolName)
                 .collect(java.util.stream.Collectors.toSet());
-        assertTrue(reported.containsAll(java.util.Set.of("http", "ftp", "sftp", "smb")), () -> "reported: " + reported);
+        assertEquals(java.util.Set.of("http", "ftp", "sftp", "smb"), reported);
     }
 
     @Test

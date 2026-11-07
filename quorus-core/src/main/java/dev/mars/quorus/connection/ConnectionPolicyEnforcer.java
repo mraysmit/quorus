@@ -17,6 +17,16 @@ import java.util.Set;
 
 /** Shared default-deny policy engine used before controller approval and again by the agent. */
 public final class ConnectionPolicyEnforcer {
+    private final DefaultPorts defaultPorts;
+
+    public ConnectionPolicyEnforcer() {
+        this(DefaultPorts.wellKnown());
+    }
+
+    /** Approves a portless endpoint on {@code defaultPorts}' port for its protocol (ENG-07). */
+    public ConnectionPolicyEnforcer(DefaultPorts defaultPorts) {
+        this.defaultPorts = java.util.Objects.requireNonNull(defaultPorts, "defaultPorts");
+    }
 
     public ConnectionAuthorization authorizeController(ServiceConnection connection,
                                                          ConnectionAccessRequest request,
@@ -60,7 +70,8 @@ public final class ConnectionPolicyEnforcer {
         if (connection.egressPolicy().allowedHostnames().stream().noneMatch(rule -> hostnameMatches(rule, host))) {
             deny("Q-EGRESS-HOST", "Endpoint host is not approved");
         }
-        if (!connection.egressPolicy().allowedPorts().contains(connection.effectivePort())) {
+        if (!connection.egressPolicy().allowedPorts().contains(
+                defaultPorts.effectivePort(connection.protocol(), connection.endpoint()))) {
             deny("Q-EGRESS-PORT", "Endpoint port is not approved");
         }
 

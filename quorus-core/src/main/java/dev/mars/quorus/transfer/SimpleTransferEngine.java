@@ -123,7 +123,8 @@ public class SimpleTransferEngine implements TransferEngine {
         this.slots = new Semaphore(maxConcurrentTransfers);
         this.protocolFactory = protocolFactory;
 
-        this.telemetryMetrics = TransferTelemetryMetrics.getInstance();
+        // Statistics of its own, so the health check reports this engine's transfers only (ENG-11).
+        this.telemetryMetrics = new TransferTelemetryMetrics();
         telemetryMetrics.registerProtocol("http");
         telemetryMetrics.registerProtocol("ftp");
         telemetryMetrics.registerProtocol("sftp");

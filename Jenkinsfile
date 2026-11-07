@@ -76,6 +76,8 @@ pipeline {
                description: 'Regression mode: test failures and JaCoCo rule violations do not stop the reactor, so every module runs and reports. Failures still show in the JUnit view, and the build ends UNSTABLE. Off is the release gate.')
         string(name: 'FOCUSED_TESTS', defaultValue: '', trim: true,
                description: 'Empty runs the lanes. Otherwise a Surefire -Dtest selector (comma-separated test classes) run in quorus-core, quorus-controller and quorus-agent with -am, instead of the lanes. Test failures are reported, not fatal, so a TDD red run or a mutation check completes; the build ends UNSTABLE when a test fails.')
+        booleanParam(name: 'FOCUSED_INCLUDE_DOCKER', defaultValue: false,
+               description: 'With FOCUSED_TESTS: also run selected tests in the docker and slow groups. Builds the host runtime jars first, as the docker tests package them.')
     }
 
     environment {
@@ -144,10 +146,20 @@ if [[ ! "$FOCUSED_TESTS" =~ ^[A-Za-z0-9_.,#*$-]+$ ]]; then
     exit 2
 fi
 mkdir -p logs
-mvn -B -Dstyle.color=never -Dmaven.repo.local="$MAVEN_REPO" clean test \
+log="logs/quorus-focused-$(date -u +%Y-%m-%d_%H-%M-%S)-$BUILD_NUMBER.log"
+goals=(clean test)
+groups=()
+if [[ "${FOCUSED_INCLUDE_DOCKER:-false}" == true ]]; then
+    # The docker tests package the host-built jars, so build them first and do not clean afterwards.
+    MAVEN_ARGS="-Dmaven.repo.local=$MAVEN_REPO -Dstyle.color=never" sh docker/build-runtime.sh 2>&1 | tee "$log"
+    [[ "${PIPESTATUS[0]}" == 0 ]] || exit 1
+    goals=(test)
+    groups=(-Dtest.excludedGroups=)
+fi
+mvn -B -Dstyle.color=never -Dmaven.repo.local="$MAVEN_REPO" "${goals[@]}" "${groups[@]}" \
     -pl quorus-core,quorus-controller,quorus-agent -am "-Dtest=$FOCUSED_TESTS" \
     -Dsurefire.failIfNoSpecifiedTests=false -Dmaven.test.failure.ignore=true 2>&1 \
-    | tee "logs/quorus-focused-$(date -u +%Y-%m-%d_%H-%M-%S)-$BUILD_NUMBER.log"
+    | tee -a "$log"
 exit "${PIPESTATUS[0]}"
 '''
             }

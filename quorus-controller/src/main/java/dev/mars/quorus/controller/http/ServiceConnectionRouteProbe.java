@@ -5,6 +5,7 @@
 package dev.mars.quorus.controller.http;
 
 import dev.mars.quorus.connection.ConnectionPolicyEnforcer;
+import dev.mars.quorus.connection.DefaultPorts;
 import dev.mars.quorus.connection.ServiceConnection;
 
 import java.net.InetSocketAddress;
@@ -17,10 +18,16 @@ public final class ServiceConnectionRouteProbe {
 
     public static Result probe(ConnectionPolicyEnforcer.ConnectionAuthorization authorization,
                                Duration timeout) throws Exception {
+        return probe(authorization, timeout, DefaultPorts.wellKnown());
+    }
+
+    /** Probes a portless endpoint on {@code defaultPorts}' port for its protocol, as the policy approved it (ENG-07). */
+    public static Result probe(ConnectionPolicyEnforcer.ConnectionAuthorization authorization,
+                               Duration timeout, DefaultPorts defaultPorts) throws Exception {
         if (authorization.resolvedAddresses().isEmpty()) {
             throw new IllegalArgumentException("Authorization has no approved addresses");
         }
-        int port = ServiceConnection.effectivePort(
+        int port = defaultPorts.effectivePort(
                 ServiceConnection.Protocol.fromScheme(authorization.endpoint().getScheme()),
                 authorization.endpoint());
         long started = System.nanoTime();

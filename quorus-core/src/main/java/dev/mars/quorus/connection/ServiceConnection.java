@@ -90,14 +90,6 @@ public record ServiceConnection(
         }
     }
 
-    public int effectivePort() {
-        return effectivePort(protocol, endpoint);
-    }
-
-    public static int effectivePort(Protocol protocol, URI endpoint) {
-        return endpoint.getPort() > 0 ? endpoint.getPort() : protocol.defaultPort();
-    }
-
     private static void requireProtocolTrust(Protocol protocol, TrustPolicy trust, EgressPolicy egress) {
         if (protocol == Protocol.SFTP && trust.sshHostKeyFingerprints().isEmpty()) {
             throw new IllegalArgumentException("SFTP requires at least one approved SSH host-key fingerprint");

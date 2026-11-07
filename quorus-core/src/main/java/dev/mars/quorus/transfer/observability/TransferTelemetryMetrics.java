@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * OpenTelemetry metrics for Quorus Core Transfer Engine.
  * Phase 8 of the OpenTelemetry migration.
- * 
+ *
  * Replaces the manual TransferMetrics class with OpenTelemetry instrumentation.
  * Provides comprehensive transfer metrics:
  * - quorus.transfer.active (gauge) - Currently active transfers
@@ -46,6 +46,11 @@ import java.util.concurrent.atomic.AtomicLong;
  * - quorus.transfer.throughput.bytes_per_second (histogram) - Throughput distribution
  * - quorus.transfer.retries (counter) - Number of retry attempts
  *
+ * <p>The OpenTelemetry instruments are process-wide: they are registered once, and every instance records
+ * into them, so the exported metrics cover the whole process. The per-protocol statistics that a health
+ * check reads back belong to the instance, and each transfer engine owns one, so an engine reports only its
+ * own transfers (register item ENG-11).
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2026-01-27
  * @version 1.0 (OpenTelemetry)
@@ -55,97 +60,89 @@ public class TransferTelemetryMetrics {
     private static final Logger logger = LoggerFactory.getLogger(TransferTelemetryMetrics.class);
     private static final String METER_NAME = "quorus-core";
 
-    // Singleton instance
-    // Singleton implemented using Initialization-on-Demand Holder idiom
-    // Thread-safe, lazy initialization without synchronization
-    private static final class Holder {
-        private static final TransferTelemetryMetrics INSTANCE = new TransferTelemetryMetrics();
-    }
-
-    // Counters
-    private final LongCounter transfersTotal;
-    private final LongCounter transfersCompleted;
-    private final LongCounter transfersFailed;
-    private final LongCounter transfersCancelled;
-    private final LongCounter bytesTransferred;
-    private final LongCounter retryAttempts;
-
-    // Histograms
-    private final DoubleHistogram transferDuration;
-    private final DoubleHistogram transferThroughput;
-
-    // Gauges (backed by AtomicLong)
-    private final AtomicLong activeTransfers = new AtomicLong(0);
-
-    // Per-protocol read-back counters for health check (OTel counters are write-only)
-    private final ConcurrentHashMap<String, AtomicLong> perProtocolTotal = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, AtomicLong> perProtocolFailed = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, AtomicLong> perProtocolActive = new ConcurrentHashMap<>();
-
     // Attribute keys
     private static final AttributeKey<String> PROTOCOL_KEY = AttributeKey.stringKey("protocol");
     private static final AttributeKey<String> DIRECTION_KEY = AttributeKey.stringKey("direction");
     private static final AttributeKey<String> ERROR_TYPE_KEY = AttributeKey.stringKey("error.type");
 
-    private TransferTelemetryMetrics() {
-        Meter meter = GlobalOpenTelemetry.getMeter(METER_NAME);
+    /**
+     * The process-wide instruments, registered once (Initialization-on-Demand Holder idiom). The active
+     * gauge reports every instance's running transfers.
+     */
+    private static final class Instruments {
+        private static final Instruments INSTANCE = new Instruments();
 
-        // Initialize counters
-        transfersTotal = meter.counterBuilder("quorus.transfer.total")
-                .setDescription("Total number of transfers initiated")
-                .setUnit("1")
-                .build();
+        private final LongCounter transfersTotal;
+        private final LongCounter transfersCompleted;
+        private final LongCounter transfersFailed;
+        private final LongCounter transfersCancelled;
+        private final LongCounter bytesTransferred;
+        private final LongCounter retryAttempts;
+        private final DoubleHistogram transferDuration;
+        private final DoubleHistogram transferThroughput;
+        private final AtomicLong activeTransfers = new AtomicLong(0);
 
-        transfersCompleted = meter.counterBuilder("quorus.transfer.completed")
-                .setDescription("Number of successfully completed transfers")
-                .setUnit("1")
-                .build();
+        private Instruments() {
+            Meter meter = GlobalOpenTelemetry.getMeter(METER_NAME);
 
-        transfersFailed = meter.counterBuilder("quorus.transfer.failed")
-                .setDescription("Number of failed transfers")
-                .setUnit("1")
-                .build();
+            transfersTotal = meter.counterBuilder("quorus.transfer.total")
+                    .setDescription("Total number of transfers initiated")
+                    .setUnit("1")
+                    .build();
 
-        transfersCancelled = meter.counterBuilder("quorus.transfer.cancelled")
-                .setDescription("Number of cancelled transfers")
-                .setUnit("1")
-                .build();
+            transfersCompleted = meter.counterBuilder("quorus.transfer.completed")
+                    .setDescription("Number of successfully completed transfers")
+                    .setUnit("1")
+                    .build();
 
-        bytesTransferred = meter.counterBuilder("quorus.transfer.bytes.total")
-                .setDescription("Total bytes transferred")
-                .setUnit("By")
-                .build();
+            transfersFailed = meter.counterBuilder("quorus.transfer.failed")
+                    .setDescription("Number of failed transfers")
+                    .setUnit("1")
+                    .build();
 
-        retryAttempts = meter.counterBuilder("quorus.transfer.retries")
-                .setDescription("Number of transfer retry attempts")
-                .setUnit("1")
-                .build();
+            transfersCancelled = meter.counterBuilder("quorus.transfer.cancelled")
+                    .setDescription("Number of cancelled transfers")
+                    .setUnit("1")
+                    .build();
 
-        // Initialize histograms
-        transferDuration = meter.histogramBuilder("quorus.transfer.duration.seconds")
-                .setDescription("Transfer duration in seconds")
-                .setUnit("s")
-                .build();
+            bytesTransferred = meter.counterBuilder("quorus.transfer.bytes.total")
+                    .setDescription("Total bytes transferred")
+                    .setUnit("By")
+                    .build();
 
-        transferThroughput = meter.histogramBuilder("quorus.transfer.throughput.bytes_per_second")
-                .setDescription("Transfer throughput in bytes per second")
-                .setUnit("By/s")
-                .build();
+            retryAttempts = meter.counterBuilder("quorus.transfer.retries")
+                    .setDescription("Number of transfer retry attempts")
+                    .setUnit("1")
+                    .build();
 
-        // Initialize gauges
-        meter.gaugeBuilder("quorus.transfer.active")
-                .setDescription("Number of currently active transfers")
-                .ofLongs()
-                .buildWithCallback(measurement -> measurement.record(activeTransfers.get()));
+            transferDuration = meter.histogramBuilder("quorus.transfer.duration.seconds")
+                    .setDescription("Transfer duration in seconds")
+                    .setUnit("s")
+                    .build();
 
-        logger.info("TransferTelemetryMetrics initialized");
+            transferThroughput = meter.histogramBuilder("quorus.transfer.throughput.bytes_per_second")
+                    .setDescription("Transfer throughput in bytes per second")
+                    .setUnit("By/s")
+                    .build();
+
+            meter.gaugeBuilder("quorus.transfer.active")
+                    .setDescription("Number of currently active transfers")
+                    .ofLongs()
+                    .buildWithCallback(measurement -> measurement.record(activeTransfers.get()));
+
+            logger.info("TransferTelemetryMetrics instruments initialized");
+        }
     }
 
-    /**
-     * Get the singleton instance of TransferTelemetryMetrics.
-     */
-    public static TransferTelemetryMetrics getInstance() {
-        return Holder.INSTANCE;
+    private final Instruments instruments = Instruments.INSTANCE;
+
+    // Per-protocol read-back counters for this instance's health check (OTel counters are write-only)
+    private final ConcurrentHashMap<String, AtomicLong> perProtocolTotal = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, AtomicLong> perProtocolFailed = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, AtomicLong> perProtocolActive = new ConcurrentHashMap<>();
+
+    /** Creates statistics of its own that record into the process-wide instruments. */
+    public TransferTelemetryMetrics() {
     }
 
     /**
@@ -194,8 +191,8 @@ public class TransferTelemetryMetrics {
                 .put(PROTOCOL_KEY, protocol)
                 .put(DIRECTION_KEY, direction)
                 .build();
-        transfersTotal.add(1, attrs);
-        activeTransfers.incrementAndGet();
+        instruments.transfersTotal.add(1, attrs);
+        instruments.activeTransfers.incrementAndGet();
         perProtocolTotal.computeIfAbsent(protocol, k -> new AtomicLong(0)).incrementAndGet();
         perProtocolActive.computeIfAbsent(protocol, k -> new AtomicLong(0)).incrementAndGet();
     }
@@ -203,23 +200,23 @@ public class TransferTelemetryMetrics {
     /**
      * Record a transfer completed successfully.
      */
-    public void recordTransferCompleted(String protocol, String direction, 
+    public void recordTransferCompleted(String protocol, String direction,
                                         long bytes, double durationSeconds) {
-        activeTransfers.decrementAndGet();
+        instruments.activeTransfers.decrementAndGet();
         perProtocolActive.computeIfAbsent(protocol, k -> new AtomicLong(0)).decrementAndGet();
-        
+
         Attributes attrs = Attributes.builder()
                 .put(PROTOCOL_KEY, protocol)
                 .put(DIRECTION_KEY, direction)
                 .build();
-        
-        transfersCompleted.add(1, attrs);
-        bytesTransferred.add(bytes, attrs);
-        transferDuration.record(durationSeconds, attrs);
-        
+
+        instruments.transfersCompleted.add(1, attrs);
+        instruments.bytesTransferred.add(bytes, attrs);
+        instruments.transferDuration.record(durationSeconds, attrs);
+
         if (durationSeconds > 0) {
             double throughput = bytes / durationSeconds;
-            transferThroughput.record(throughput, attrs);
+            instruments.transferThroughput.record(throughput, attrs);
         }
     }
 
@@ -227,32 +224,32 @@ public class TransferTelemetryMetrics {
      * Record a transfer failed.
      */
     public void recordTransferFailed(String protocol, String direction, String errorType) {
-        activeTransfers.decrementAndGet();
+        instruments.activeTransfers.decrementAndGet();
         perProtocolFailed.computeIfAbsent(protocol, k -> new AtomicLong(0)).incrementAndGet();
         perProtocolActive.computeIfAbsent(protocol, k -> new AtomicLong(0)).decrementAndGet();
-        
+
         Attributes attrs = Attributes.builder()
                 .put(PROTOCOL_KEY, protocol)
                 .put(DIRECTION_KEY, direction)
                 .put(ERROR_TYPE_KEY, errorType != null ? errorType : "unknown")
                 .build();
-        
-        transfersFailed.add(1, attrs);
+
+        instruments.transfersFailed.add(1, attrs);
     }
 
     /**
      * Record a transfer cancelled.
      */
     public void recordTransferCancelled(String protocol, String direction) {
-        activeTransfers.decrementAndGet();
+        instruments.activeTransfers.decrementAndGet();
         perProtocolActive.computeIfAbsent(protocol, k -> new AtomicLong(0)).decrementAndGet();
-        
+
         Attributes attrs = Attributes.builder()
                 .put(PROTOCOL_KEY, protocol)
                 .put(DIRECTION_KEY, direction)
                 .build();
-        
-        transfersCancelled.add(1, attrs);
+
+        instruments.transfersCancelled.add(1, attrs);
     }
 
     /**
@@ -263,14 +260,7 @@ public class TransferTelemetryMetrics {
                 .put(PROTOCOL_KEY, protocol)
                 .put(DIRECTION_KEY, direction)
                 .build();
-        
-        retryAttempts.add(1, attrs);
-    }
 
-    /**
-     * Get the current number of active transfers.
-     */
-    public long getActiveTransfers() {
-        return activeTransfers.get();
+        instruments.retryAttempts.add(1, attrs);
     }
 }

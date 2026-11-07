@@ -24,6 +24,7 @@ import dev.mars.quorus.storage.ChecksumCalculator;
 import dev.mars.quorus.transfer.TransferContext;
 import dev.mars.quorus.transfer.ProgressTracker;
 import dev.mars.quorus.util.SensitiveDataRedactor;
+import dev.mars.quorus.connection.DefaultPorts;
 import dev.mars.quorus.connection.RuntimeCredential;
 import dev.mars.quorus.connection.ServiceConnection;
 import dev.mars.quorus.connection.SftpHostKeyPolicy;
@@ -59,9 +60,20 @@ import java.util.List;
 public class SftpTransferProtocol implements TransferProtocol {
     
     private static final Logger logger = LoggerFactory.getLogger(SftpTransferProtocol.class);
-    private static final int DEFAULT_SFTP_PORT = 22;
     private static final int DEFAULT_BUFFER_SIZE = 32 * 1024; // 32KB buffer for SFTP
     private static final Duration CONNECTION_TIMEOUT = Duration.ofSeconds(30);
+
+    /** Where a portless {@code sftp://} URI connects (ENG-07). */
+    private final DefaultPorts defaultPorts;
+
+    public SftpTransferProtocol() {
+        this(DefaultPorts.wellKnown());
+    }
+
+    /** Connects a portless {@code sftp://} URI on {@code defaultPorts}' SFTP port, the one the policy approved. */
+    public SftpTransferProtocol(DefaultPorts defaultPorts) {
+        this.defaultPorts = java.util.Objects.requireNonNull(defaultPorts, "defaultPorts");
+    }
 
     // Track active SFTP client for abort capability
     
@@ -603,7 +615,7 @@ public class SftpTransferProtocol implements TransferProtocol {
         
         int port = sourceUri.getPort();
         if (port == -1) {
-            port = DEFAULT_SFTP_PORT;
+            port = defaultPorts.portFor(ServiceConnection.Protocol.SFTP);
         }
         
         String path = sourceUri.getPath();

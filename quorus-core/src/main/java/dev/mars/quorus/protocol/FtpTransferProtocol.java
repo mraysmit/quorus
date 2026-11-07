@@ -24,7 +24,9 @@ import dev.mars.quorus.storage.ChecksumCalculator;
 import dev.mars.quorus.transfer.TransferContext;
 import dev.mars.quorus.transfer.ProgressTracker;
 import dev.mars.quorus.util.SensitiveDataRedactor;
+import dev.mars.quorus.connection.DefaultPorts;
 import dev.mars.quorus.connection.RuntimeCredential;
+import dev.mars.quorus.connection.ServiceConnection;
 import dev.mars.quorus.connection.TlsPeerPolicy;
 
 import static dev.mars.quorus.core.exceptions.QuorusErrorCode.*;
@@ -86,8 +88,16 @@ public class FtpTransferProtocol implements TransferProtocol {
     /** Test-only FTPS socket factory; {@code null} in production, which uses the governed trust path. */
     private final SSLSocketFactory customSslSocketFactory;
 
+    /** Where a portless {@code ftps://} URI connects for explicit FTPS (ENG-07). */
+    private final DefaultPorts defaultPorts;
+
     public FtpTransferProtocol() {
-        this(null);
+        this(null, DefaultPorts.wellKnown());
+    }
+
+    /** Connects a portless {@code ftps://} URI on {@code defaultPorts}' FTPS port, the one the policy approved. */
+    public FtpTransferProtocol(DefaultPorts defaultPorts) {
+        this(null, defaultPorts);
     }
 
     /**
@@ -96,7 +106,12 @@ public class FtpTransferProtocol implements TransferProtocol {
      * production code cannot replace the TLS verification of the shared adapter.
      */
     FtpTransferProtocol(SSLSocketFactory sslSocketFactory) {
+        this(sslSocketFactory, DefaultPorts.wellKnown());
+    }
+
+    private FtpTransferProtocol(SSLSocketFactory sslSocketFactory, DefaultPorts defaultPorts) {
         this.customSslSocketFactory = sslSocketFactory;
+        this.defaultPorts = java.util.Objects.requireNonNull(defaultPorts, "defaultPorts");
     }
     
     @Override
@@ -390,7 +405,8 @@ public class FtpTransferProtocol implements TransferProtocol {
         }
         
         if (port == -1) {
-            port = (ftpsMode == FtpsMode.IMPLICIT) ? DEFAULT_FTPS_IMPLICIT_PORT : DEFAULT_FTP_PORT;
+            // Implicit FTPS needs an explicit 990, so a portless URI is plain FTP or explicit FTPS.
+            port = isFtps ? defaultPorts.portFor(ServiceConnection.Protocol.FTPS) : DEFAULT_FTP_PORT;
         }
         
         String path = sourceUri.getPath();

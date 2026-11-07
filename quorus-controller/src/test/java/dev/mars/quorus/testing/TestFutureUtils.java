@@ -115,6 +115,33 @@ public final class TestFutureUtils {
         return promise.future();
     }
 
+    /**
+     * Like {@link #eventually}, but evaluates the condition on a worker thread, so the condition may block on
+     * Vert.x futures, for example an HTTP call awaited with {@link #awaitSuccess}. {@code eventually} evaluates
+     * on the event loop, where such a condition can wait for a response that needs the loop it is blocking.
+     * The next attempt is scheduled only after the previous one returns.
+     */
+    public static Future<Void> eventuallyBlocking(Vertx vertx, BooleanSupplier condition, Duration timeout) {
+        Promise<Void> promise = Promise.promise();
+        attemptBlocking(vertx, condition, System.nanoTime() + timeout.toNanos(), timeout, promise);
+        return promise.future();
+    }
+
+    private static void attemptBlocking(Vertx vertx, BooleanSupplier condition, long deadline, Duration timeout,
+                                        Promise<Void> promise) {
+        vertx.executeBlocking(condition::getAsBoolean, false).onComplete(outcome -> {
+            if (outcome.failed()) {
+                promise.tryFail(outcome.cause());
+            } else if (Boolean.TRUE.equals(outcome.result())) {
+                promise.tryComplete();
+            } else if (System.nanoTime() >= deadline) {
+                promise.tryFail(new AssertionError("Condition was not satisfied within " + timeout));
+            } else {
+                vertx.setTimer(10, id -> attemptBlocking(vertx, condition, deadline, timeout, promise));
+            }
+        });
+    }
+
     private static void awaitContext(VertxTestContext context, Duration timeout) {
         try {
             if (!context.awaitCompletion(timeout.toMillis(), TimeUnit.MILLISECONDS)) {

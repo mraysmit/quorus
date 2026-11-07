@@ -32,7 +32,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static dev.mars.quorus.testing.TestFutureUtils.awaitSuccess;
-import static dev.mars.quorus.testing.TestFutureUtils.eventually;
+import static dev.mars.quorus.testing.TestFutureUtils.eventuallyBlocking;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -158,7 +158,7 @@ class ContainerRecreationDurabilityTest {
         // already up to date never receives an InstallSnapshot and so writes no snapshot file.
         // Asserting against a fixed node would therefore assert the wrong thing.
         String leaderVolume = cluster.volumeName(leaderNodeName() + "-data");
-        awaitSuccess(eventually(vertx,
+        awaitSuccess(eventuallyBlocking(vertx,
                 () -> containsSnapshotArtifact(DockerComposeCluster.listVolumeContents(leaderVolume, "/raft")),
                 TIMEOUT), TIMEOUT.plusSeconds(5));
 
@@ -284,7 +284,7 @@ class ContainerRecreationDurabilityTest {
     }
 
     private void awaitReady(DockerComposeCluster target) {
-        awaitSuccess(eventually(vertx, () -> {
+        awaitSuccess(eventuallyBlocking(vertx, () -> {
             List<String> endpoints = target.controllerEndpoints(NODE_COUNT);
             return endpoints.stream().allMatch(this::isHealthy) && hasLeader(endpoints);
         }, TIMEOUT), TIMEOUT.plusSeconds(5));
@@ -327,7 +327,7 @@ class ContainerRecreationDurabilityTest {
                 .put("totalBytes", 8_192L)
                 .put("tenantId", TENANT_ID);
 
-        awaitSuccess(eventually(vertx, () -> {
+        awaitSuccess(eventuallyBlocking(vertx, () -> {
             for (String endpoint : target.controllerEndpoints(NODE_COUNT)) {
                 URI uri = URI.create(endpoint);
                 try {
@@ -350,7 +350,7 @@ class ContainerRecreationDurabilityTest {
     }
 
     private void awaitVisibleOnEveryNode(DockerComposeCluster target, String jobId) {
-        awaitSuccess(eventually(vertx, () -> target.controllerEndpoints(NODE_COUNT).stream()
+        awaitSuccess(eventuallyBlocking(vertx, () -> target.controllerEndpoints(NODE_COUNT).stream()
                 .allMatch(endpoint -> findTransfer(endpoint, jobId) != null), TIMEOUT),
                 TIMEOUT.plusSeconds(5));
     }

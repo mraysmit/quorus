@@ -29,15 +29,22 @@ import java.util.concurrent.TimeUnit;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * An {@code ftps://} endpoint without a port is approved by the policy, and connected by the adapter, on the
+ * same explicit-TLS default port (register item ENG-07 part 1). The default-port table maps FTPS to an
+ * ephemeral port, so the claim is tested end to end without binding the privileged port 21.
+ */
 @Timeout(value = 30, unit = SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
 class FtpsDefaultPortBoundaryTest {
+    private static final byte[] LOOPBACK = {127, 0, 0, 1};
+
     @TempDir Path directory;
 
     @Test
     void policyApprovesTheExplicitTlsPortActuallyUsedByTheAdapter() throws Exception {
-        // The fixture listens on port 21 because the claim under test is that an ftps:// URI without a
-        // port is approved, and connected, on the explicit-TLS default port.
-        try (ServerSocket server = new ServerSocket(21, 1, InetAddress.getByAddress(new byte[]{127, 0, 0, 1}))) {
+        try (ServerSocket server = new ServerSocket(0, 1, InetAddress.getByAddress(LOOPBACK))) {
+            int defaultPort = server.getLocalPort();
+            DefaultPorts ports = DefaultPorts.wellKnown().with(ServiceConnection.Protocol.FTPS, defaultPort);
             CompletableFuture<String> command = CompletableFuture.supplyAsync(() -> firstCommand(server));
             var connection = new ServiceConnection("connection", "tenant", ServiceConnection.Protocol.FTPS,
                     URI.create("ftps://localhost"), "zone", Set.of("/approved"),
@@ -45,17 +52,20 @@ class FtpsDefaultPortBoundaryTest {
                     "secret", "identity", ServiceConnection.AuthenticationType.PASSWORD,
                     new ServiceConnection.TrustPolicy(true, true, Set.of("fixture"), Set.of(), "TLSv1.3"),
                     new ServiceConnection.EgressPolicy(Set.of("localhost"), Set.of("127.0.0.0/8"),
-                            Set.of(21), false, true), 1, ServiceConnection.Status.ACTIVE, Instant.now(), Instant.now());
-            var authorization = new ConnectionPolicyEnforcer().authorizeController(connection,
+                            Set.of(defaultPort), false, true), 1, ServiceConnection.Status.ACTIVE,
+                    Instant.now(), Instant.now());
+            var authorization = new ConnectionPolicyEnforcer(ports).authorizeController(connection,
                     new ConnectionAccessRequest("tenant", "/approved/file", ServiceConnection.Direction.DOWNLOAD,
-                            "pool", List.of()), host -> List.of(InetAddress.getByAddress(new byte[]{127, 0, 0, 1})));
+                            "pool", List.of()), host -> List.of(InetAddress.getByAddress(LOOPBACK)));
+            assertEquals(-1, authorization.endpoint().getPort(), "the approved endpoint must name no port");
+
             try (var credential = new RuntimeCredential("fixture", ServiceConnection.AuthenticationType.PASSWORD,
                     new char[0], Set.of(), Set.of(), Set.of(), "TLSv1.3", authorization.resolvedAddresses())) {
                 var request = TransferRequest.builder().requestId("ftps-port")
                         .sourceUri(authorization.endpoint()).destinationPath(directory.resolve("file"))
                         .runtimeCredential(credential).build();
 
-                assertThrows(TransferException.class, () -> new FtpTransferProtocol().transfer(request,
+                assertThrows(TransferException.class, () -> new FtpTransferProtocol(ports).transfer(request,
                         new TransferContext(new TransferJob(request))));
 
                 assertEquals("AUTH TLS", command.get(5, TimeUnit.SECONDS));
